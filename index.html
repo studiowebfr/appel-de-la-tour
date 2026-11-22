@@ -1243,14 +1243,14 @@ function guildPower(){const g=G();return power()+g.members.reduce((t,m)=>t+membe
 function league(t){let L=LEAGUES[0];LEAGUES.forEach(x=>{if(t>=x.t)L=x});return L}
 function glog(t){const g=G();g.log.unshift({t,at:Date.now()});g.log=g.log.slice(0,25)}
 function newBoss(lvl){const n=GBOSS[(lvl-1)%GBOSS.length],max=Math.round(guildPower()*8*(1+.35*(lvl-1)));return{n,lvl,max,hp:max,el:randEl(),t:Date.now()}}
-function createGuild(){
+function createGuild(join){
   if(S.guild)return;const el=document.getElementById('gname');
-  const name=((el&&el.value.trim())||gNameDraft||'Guilde de la Tour').slice(0,24);
+  const name=join?String(join.n||'Guilde').slice(0,24):((el&&el.value.trim())||gNameDraft||'Guilde de la Tour').slice(0,24);
   const names=[...MEMBER_NAMES].sort(()=>R()-.5);
   const members=names.slice(0,11).map((n,i)=>({n,f:+(.45+R()*.8).toFixed(2),role:i<2?'Officier':'Membre',cls:pick(Object.keys(CLASSES))}));
-  S.guild={name,color:gColor,lvl:1,xp:0,coins:0,members,pool:names.slice(11),log:[],contrib:{},day:-1,bossTix:3,donate:3,war:null,trophies:0,lastWar:null,shop:{day:-1,b:{}}};
+  S.guild={name,color:join?(join.c||GCOLORS[0]):gColor,gid:join?join.id:(GO.uid||null),lvl:1,xp:0,coins:0,members,pool:names.slice(11),log:[],contrib:{},day:-1,bossTix:3,donate:3,war:null,trophies:0,lastWar:null,shop:{day:-1,b:{}}};
   S.guild.boss=newBoss(1);S.guild.boss.t=Date.now()-3*36e5;
-  glog(`La guilde « ${name} » est fondée.`);guildDaily();save();gsub='home';render();toast(`Bienvenue dans « ${name} » !`);
+  glog(join?`Vous rejoignez la guilde « ${name} ».`:`La guilde « ${name} » est fondée.`);guildDaily();save();gsub='home';render();toast(join?`Vous rejoignez « ${name} » !`:`Bienvenue dans « ${name} » !`);goSync();
 }
 function gainGXp(x){
   const g=G();g.xp+=Math.round(x);
@@ -1298,6 +1298,66 @@ function guildTick(){
   }
   if(total)glog(`Vos coéquipiers infligent ${fmtN(total)} dégâts au boss.`);
 }
+
+/* ---------- Guildes en ligne : recherche, adhésion, membres réels ---------- */
+const GO={status:'init',db:null,uid:null,guilds:[],mem:[],ok:{g:false,m:false},last:'',lastG:''};
+let gnsub='find',gSearch='',gLeaveAsk=false;
+const pname=()=>(S&&S.settings&&S.settings.name)||'';
+const norm=t=>String(t||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
+const goCount=id=>GO.mem.filter(m=>m.g===id).length;
+function goMembers(g){return g&&g.gid?GO.mem.filter(m=>m.g===g.gid&&m.id!==GO.uid):[]}
+const goDissolved=g=>GO.status==='online'&&g&&g.gid&&g.gid!==GO.uid&&!GO.guilds.some(x=>x.id===g.gid);
+async function initGuildOnline(){
+  if(GO.status!=='init')return;GO.status='loading';
+  try{if(window.claude&&claude.use){const [db,user]=await Promise.all([claude.use('db'),claude.use('user')]);GO.db=db;if(user)GO.uid=await user.id()}}catch(e){}
+  if(!GO.db||!GO.uid){GO.status='offline';goRefresh();return}
+  const timer=setTimeout(()=>{if(GO.status==='loading'){GO.status='slow';goRefresh()}},10000);
+  const ready=()=>{if(GO.ok.g&&GO.ok.m&&GO.status!=='online'){clearTimeout(timer);GO.status='online';goSync()}goRefresh()};
+  const fail=()=>{if(GO.status!=='online'){GO.status='offline';goRefresh()}};
+  try{
+    GO.db.collection('guilds').onSnapshot(sn=>{GO.guilds=sn.docs.map(d=>({id:d.id,...d.data()}));GO.ok.g=true;ready()},fail);
+    GO.db.collection('gmem').onSnapshot(sn=>{GO.mem=sn.docs.map(d=>({id:d.id,...d.data()}));GO.ok.m=true;ready()},fail);
+  }catch(e){fail()}
+  setInterval(goSync,60000);
+}
+async function goSync(){
+  if(GO.status!=='online'||!S||!S.guild)return;
+  const g=S.guild;if(!g.gid){g.gid=GO.uid;save()}
+  const me={g:g.gid,p:pname().slice(0,20)||null,pw:Math.round(power()/100)*100},k=JSON.stringify(me);
+  if(k!==GO.last){GO.last=k;try{await GO.db.collection('gmem').doc(GO.uid).set({...me,t:Date.now()})}catch(e){GO.last=''}}
+  if(g.gid===GO.uid){
+    const gd={n:g.name.slice(0,24),c:g.color,lvl:g.lvl,tr:g.trophies||0,p:pname().slice(0,20)||null},kg=JSON.stringify(gd);
+    if(kg!==GO.lastG){GO.lastG=kg;try{await GO.db.collection('guilds').doc(GO.uid).set(gd)}catch(e){GO.lastG=''}}
+  }
+}
+function goRefresh(){
+  if(typeof tab==='undefined'||tab!=='guild')return;
+  const l=document.getElementById('glist');if(l){l.innerHTML=gListHTML();return}
+  if(S.guild&&gsub!=='home')return;
+  const a=document.activeElement;if(!busy&&!(a&&/INPUT|TEXTAREA|SELECT/.test(a.tagName)))render();
+}
+function gListHTML(){
+  if(GO.status==='offline')return'<p class="empty">La recherche est indisponible : le jeu n’est pas connecté au serveur.</p>';
+  if(GO.status==='slow')return'<p class="empty">Le serveur ne répond pas encore. Réessayez dans un instant.</p>';
+  if(GO.status!=='online')return'<p class="empty">Chargement des guildes…</p>';
+  const q=norm(gSearch.trim());
+  const list=GO.guilds.map(x=>({...x,cnt:Math.max(1,goCount(x.id))})).filter(x=>!q||norm(x.n).includes(q)||norm(x.p).includes(q)).sort((a,b)=>b.cnt-a.cnt||(b.lvl||1)-(a.lvl||1)).slice(0,50);
+  if(!list.length)return`<p class="empty">${q?'Aucune guilde ne correspond à cette recherche.':'Aucune guilde pour l’instant. Fondez la première !'}</p>`;
+  return list.map(x=>`<div class="mrow"><div class="ava">${emblem({name:x.n||'?',color:x.c||GCOLORS[0]},34)}</div><div class="mi"><b>${esc(x.n||'Guilde')}</b><span class="role">Niv. ${x.lvl||1}</span><div class="meta">Chef : ${esc(x.p||'Joueur')} · ${x.cnt}/${GMAX} joueurs</div></div><button class="btn sm${x.cnt<GMAX?' prime':''}" data-act="gjoin" data-id="${esc(x.id)}" ${x.cnt>=GMAX?'disabled':''}>${x.cnt>=GMAX?'Complète':'Rejoindre'}</button></div>`).join('');
+}
+function joinGuild(id){
+  if(S.guild)return;if(GO.status!=='online')return toast('Le serveur n’est pas joignable pour le moment.');
+  const x=GO.guilds.find(g=>g.id===id);if(!x)return toast('Cette guilde n’existe plus.');
+  if(goCount(id)>=GMAX)return toast('Cette guilde est complète.');
+  createGuild({id,n:x.n,c:x.c});
+}
+async function leaveGuild(){
+  const g=G();if(!g)return;const own=!g.gid||g.gid===GO.uid;
+  S.guild=null;gLeaveAsk=false;gsub='home';gnsub='find';save();render();toast(own?'Votre guilde est dissoute.':'Vous avez quitté la guilde.');
+  GO.last='';GO.lastG='';
+  if(GO.db&&GO.uid){try{await GO.db.collection('gmem').doc(GO.uid).delete()}catch(e){}if(own){try{await GO.db.collection('guilds').doc(GO.uid).delete()}catch(e){}}}
+}
+document.addEventListener('input',e=>{if(e.target&&e.target.id==='gsearch'){gSearch=e.target.value;const l=document.getElementById('glist');if(l)l.innerHTML=gListHTML()}});
 const gTeam=()=>partyHeroes().map(h=>({...h,hp:stats(h).hp}));
 function gBossAttack(){
   const g=G();if(!g||busy)return;guildTick();
@@ -2580,24 +2640,32 @@ function ago(t){const m=Math.floor((Date.now()-t)/6e4);return m<1?'à l’instan
 const memberFace=m=>portrait({name:m.n,cls:m.cls,stars:Math.min(5,1+Math.round(m.f*3)),seed:hash(m.n)});
 function renderGuild(){
   const g=G();
-  if(!g)return`<section class="panel"><h2>Fonder une guilde</h2>
+  if(!g){const gtabs=`<div class="chips" style="margin:0">${[['find','Rechercher une guilde'],['new','Fonder une guilde']].map(([k,l])=>`<button class="chipbtn" data-act="gnsub" data-id="${k}" aria-pressed="${gnsub===k}">${l}</button>`).join('')}</div>`;
+  if(gnsub==='find')return gtabs+`<section class="panel"><h2>Rechercher une guilde</h2>
+    <input id="gsearch" class="sel" maxlength="24" placeholder="Nom de la guilde ou de son chef" value="${esc(gSearch)}" autocomplete="off" aria-label="Rechercher une guilde">
+    <div id="glist" style="margin-top:10px">${gListHTML()}</div>
+    <p class="note">Les guildes affichées sont celles des vrais joueurs. ${pname()?'':'Choisissez un pseudo dans les Réglages (touchez votre avatar) pour que les autres vous reconnaissent. '}Une guilde accueille jusqu’à ${GMAX} joueurs.</p></section>`;
+  return gtabs+`<section class="panel"><h2>Fonder une guilde</h2>
     <p class="hint">Une guilde donne un bonus permanent à tous vos héros, un boss commun à abattre avec vos coéquipiers, une guerre de guilde chaque jour et une boutique de guilde.</p>
     <label class="meta" for="gname">Nom de la guilde</label>
     <input id="gname" class="sel" maxlength="24" value="${esc(gNameDraft)}" autocomplete="off">
     <div class="meta" style="margin-top:12px">Couleur de l’emblème</div>
     <div class="row" style="margin:6px 0 14px">${GCOLORS.map(c=>`<button class="swatch${c===gColor?' on':''}" style="--c:${c}" data-act="gcolor" data-id="${c}" aria-label="Choisir cette couleur"></button>`).join('')}</div>
     <div><button class="btn prime" data-act="gcreate">Fonder la guilde</button></div>
-    <p class="note">Le jeu se joue en solo : vos coéquipiers et les guildes rivales sont simulés.</p></section>`;
+    <p class="note">Votre guilde apparaîtra dans la recherche : les autres joueurs pourront la rejoindre. En attendant, des recrues simulées complètent l’effectif, et les guildes rivales de la guerre sont simulées.</p></section>`;}
   const L=league(g.trophies),subs=[['home','Guilde'],['boss','Boss'],['war','Guerre'],['shop','Boutique']];
   let body='';
   if(gsub==='home'){
-    const mem=[{n:'Vous',me:true,pw:power(),role:'Chef'},...g.members.map(m=>({...m,pw:memberPow(m)}))].sort((a,b)=>(b.me?1:0)-(a.me?1:0)||b.pw-a.pw);
-    body=`<section class="panel"><h2>Dons du jour · ${g.donate}/3</h2><div class="row">
+    const real=goMembers(g),sims=g.members.slice(0,Math.max(0,GMAX-1-real.length)),own=!g.gid||g.gid===GO.uid;
+    const mem=[{n:'Vous',me:true,pw:power(),role:own?'Chef':'Membre'},...real.map(m=>({n:m.p||'Joueur',pw:m.pw||0,role:m.id===g.gid?'Chef':'Joueur',real:true,cls:Object.keys(CLASSES)[Math.abs(hash(m.id))%5],f:1})),...sims.map(m=>({...m,pw:memberPow(m),role:m.role==='Officier'?'Recrue · officier':'Recrue'}))].sort((a,b)=>(b.me?1:0)-(a.me?1:0)||(b.real?1:0)-(a.real?1:0)||b.pw-a.pw);
+    const onl=GO.status==='online'?(goDissolved(g)?'<section class="panel"><p class="bad" style="margin:0">Le chef a dissous cette guilde. Quittez-la pour en rejoindre une autre.</p></section>':`<section class="panel"><div class="good">Guilde en ligne · ${real.length+1} joueur${real.length?'s':''} réel${real.length?'s':''}</div><div class="meta">${own?'Les autres joueurs peuvent trouver votre guilde dans la recherche et la rejoindre.':'Vous êtes membre de cette guilde.'}${pname()?'':' Choisissez un pseudo dans les Réglages pour que vos coéquipiers vous reconnaissent.'}</div></section>`):GO.status==='offline'?'':'';
+    body=`${onl}<section class="panel"><h2>Dons du jour · ${g.donate}/3</h2><div class="row">
         <button class="btn" data-act="gdon" data-id="gold" ${g.donate<1||S.gold<1000?'disabled':''}>Donner 1 000 or · +100 XP · +20 médailles</button>
         <button class="btn" data-act="gdon" data-id="gems" ${g.donate<1||S.gems<100?'disabled':''}>Donner 100 cristaux · +250 XP · +50 médailles</button></div></section>
-      <section class="panel"><h2>Membres · ${g.members.length+1}/${GMAX}</h2>${mem.map(m=>`<div class="mrow"><div class="ava">${m.me?(favHero()?portrait(favHero()):''):memberFace(m)}</div><div class="mi"><b>${esc(m.n)}</b><span class="role">${m.role}</span><div class="meta">Puissance ${fmtN(m.pw)}</div></div><span class="meta">${fmtN(g.contrib[m.me?'__me':m.n]||0)} dég.</span></div>`).join('')}
-        <p class="note">Dégâts au boss du jour. Deux nouveaux membres rejoignent la guilde à chaque niveau, jusqu’à ${GMAX} membres (vous compris).</p></section>
-      <section class="panel"><h2>Journal</h2><div class="glog">${g.log.slice(0,12).map(x=>`<div><span>${esc(x.t)}</span><span class="meta">${ago(x.at)}</span></div>`).join('')}</div></section>`;
+      <section class="panel"><h2>Membres · ${mem.length}/${GMAX}</h2>${mem.map(m=>`<div class="mrow"><div class="ava">${m.me?(favHero()?portrait(favHero()):''):memberFace(m)}</div><div class="mi"><b>${esc(m.n)}</b><span class="role">${m.role}</span><div class="meta">Puissance ${fmtN(m.pw)}</div></div><span class="meta">${m.real?'':`${fmtN(g.contrib[m.me?'__me':m.n]||0)} dég.`}</span></div>`).join('')}
+        <p class="note">Les joueurs réels apparaissent en premier. Les recrues sont simulées : deux nouvelles arrivent à chaque niveau, et elles laissent leur place quand de vrais joueurs rejoignent la guilde (${GMAX} membres au total). Dégâts au boss : ceux du jour, de vos recrues et de vous. Le boss, le niveau et la guerre restent propres à chaque joueur.</p></section>
+      <section class="panel"><h2>Journal</h2><div class="glog">${g.log.slice(0,12).map(x=>`<div><span>${esc(x.t)}</span><span class="meta">${ago(x.at)}</span></div>`).join('')}</div></section>
+      <section class="panel">${gLeaveAsk?`<p style="margin-top:0">${own?'Votre guilde sera dissoute pour tous ses membres.':'Vous quitterez cette guilde.'} Vous perdrez son niveau, ses médailles et son bonus. Confirmer ?</p><div class="row"><button class="btn" data-act="gleaveno">Annuler</button><button class="btn prime" data-act="gleaveok">${own?'Dissoudre la guilde':'Quitter la guilde'}</button></div>`:`<button class="btn" data-act="gleave">${own?'Dissoudre la guilde':'Quitter la guilde'}</button>`}</section>`;
   }
   if(gsub==='boss'){
     const b=g.boss,pct=Math.max(0,b.hp/b.max*100),rank=Object.entries(g.contrib).sort((a,b)=>b[1]-a[1]).slice(0,10),top=rank.length?rank[0][1]:1;
@@ -2751,7 +2819,7 @@ document.addEventListener('click',e=>{
     case 'mclose':closeModal();break;
     case 'keepcloud':if(conflictRemote)adoptSave(conflictRemote,'Sauvegarde en ligne chargée.');break;
     case 'keeplocal':CLOUD.status='on';closeModal();save();cloudPush();toast('Sauvegarde de cet appareil conservée.');break;
-    case 'setname':{const v=(document.getElementById('pseudo').value||'').replace(/\s+/g,' ').trim().slice(0,20);S.settings=S.settings||{};S.settings.name=v;save();toast(v?`Pseudo enregistré : ${v}`:'Pseudo effacé.');break}
+    case 'setname':{const v=(document.getElementById('pseudo').value||'').replace(/\s+/g,' ').trim().slice(0,20);S.settings=S.settings||{};S.settings.name=v;save();goSync();toast(v?`Pseudo enregistré : ${v}`:'Pseudo effacé.');break}
     case 'togsfx':S.settings=S.settings||{};S.settings.sfx=S.settings.sfx===false;save();openSettings();break;
     case 'togmusic':S.settings=S.settings||{};S.settings.music=!S.settings.music;save();if(typeof musicSync==='function')musicSync();openSettings();break;
     case 'cloudnow':save();cloudPush().then(()=>toast('Sauvegarde envoyée.'));break;
@@ -2768,6 +2836,11 @@ document.addEventListener('click',e=>{
     case 'pvpwatch':pvpWatch(id);break;
     case 'gcolor':gColor=id;render();break;
     case 'gcreate':createGuild();break;
+    case 'gnsub':gnsub=id;render();break;
+    case 'gjoin':joinGuild(id);break;
+    case 'gleave':gLeaveAsk=true;render();break;
+    case 'gleaveno':gLeaveAsk=false;render();break;
+    case 'gleaveok':leaveGuild();break;
     case 'gsub':gsub=id;render();break;
     case 'gdon':gDonate(id);break;
     case 'gboss':gBossAttack();break;
@@ -2809,7 +2882,7 @@ document.getElementById('chatfab').addEventListener('click',()=>chatToggle());
 document.getElementById('chatclose').addEventListener('click',()=>chatToggle(false));
 document.getElementById('chatform').addEventListener('submit',e=>{e.preventDefault();chatSend()});
 document.addEventListener('keydown',e=>{if(e.key!=='Escape')return;if(!document.getElementById('modal').hidden&&!modalLocked){closeModal();return}if(CH.open)chatToggle(false)});
-if(!window.claude){document.getElementById('chatfab').hidden=true}else initChat();
+if(!window.claude){document.getElementById('chatfab').hidden=true;GO.status='offline'}else{initChat();initGuildOnline()}
 document.addEventListener('input',e=>{if(e.target.id==='gname')gNameDraft=e.target.value});
 document.addEventListener('change',e=>{if(e.target.id==='rsel')royaleSel=Number(e.target.value)});
 setInterval(()=>{if(!busy&&((tab==='train'&&S.train.length)||tab==='tower'||tab==='events'||tab==='guild')){render();save()}},30000);

@@ -13,6 +13,16 @@ service cloud.firestore {
                    && request.resource.data.msgs.size() <= 40;
       allow delete: if request.auth != null && request.auth.uid == uid;
     }
+    // Guildes en ligne : tout le monde lit, chaque chef n'écrit que sa guilde
+    match /guilds/{uid} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.uid == uid;
+    }
+    // Adhésions : tout le monde lit, chacun n'écrit que la sienne
+    match /gmem/{uid} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.uid == uid;
+    }
     // Sauvegardes : privées, seul le joueur lui-même peut lire et écrire la sienne
     match /data/users/{uid}/{docId} {
       allow read, write: if request.auth != null && request.auth.uid == uid;
