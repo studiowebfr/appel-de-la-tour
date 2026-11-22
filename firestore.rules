@@ -1,0 +1,21 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Draft de l'Oracle : tout le monde lit, chacun n'écrit que son équipe
+    match /drafts/{uid} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.uid == uid;
+    }
+    // Chat global : tout le monde lit, chacun n'écrit que ses propres messages
+    match /chat/{uid} {
+      allow read: if true;
+      allow create, update: if request.auth != null && request.auth.uid == uid
+                   && request.resource.data.msgs.size() <= 40;
+      allow delete: if request.auth != null && request.auth.uid == uid;
+    }
+    // Sauvegardes : privées, seul le joueur lui-même peut lire et écrire la sienne
+    match /data/users/{uid}/{docId} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+  }
+}
