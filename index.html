@@ -639,6 +639,14 @@ img.art.foe{object-position:50% 50%}
 .rtaslot.banned::after,.pcard.banned::after{content:"BANNI";position:absolute;inset:auto 0 40% 0;text-align:center;font-weight:900;color:#ff6b6b;letter-spacing:.08em;text-shadow:0 0 6px #000}
 .btn.big{width:100%;min-height:52px;font-size:17px}
 .tearbox{display:flex;gap:10px;align-items:center;padding:10px;border-radius:10px;border:1px solid rgba(185,140,255,.5);background:rgba(40,16,70,.45);margin-bottom:8px}
+.tmode{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:0 0 10px}
+.tmode button{min-height:44px;border-radius:10px;border:1.5px solid rgba(127,220,255,.35);background:rgba(6,14,32,.6);color:#bff0ff;font:inherit;font-weight:800;cursor:pointer}
+.tmode button[aria-selected="true"]{background:linear-gradient(180deg,#3fb8ff,#1d6fd0);color:#fff;border-color:#9fe3ff}
+.tmode button.hard{color:#ffb0a0;border-color:rgba(255,90,70,.5)}
+.tmode button.hard[aria-selected="true"]{background:linear-gradient(180deg,#ff5a4a,#9b1420);color:#fff;border-color:#ffb0a0;box-shadow:0 0 16px rgba(255,70,60,.5)}
+.panel.hardp{border-color:rgba(255,90,70,.6);box-shadow:0 0 0 1px rgba(255,90,70,.3),0 0 26px rgba(255,60,50,.18);background:linear-gradient(180deg,rgba(60,8,14,.55),rgba(6,14,32,.75))}
+.panel.hardp .floorno{color:#ffb0a0}
+.btn.hardbtn{background:linear-gradient(180deg,#ff5a4a,#9b1420);border-color:#ffb0a0;color:#fff}
 </style>
 
 <div class="app">
@@ -1832,7 +1840,7 @@ function pvpWatch(id){
 /* ---------- Classements (PvE, PvP, guildes) ---------- */
 let rsub='pve',lbLast='',lbAt=0;
 const etTotal=()=>Object.values(S.et||{}).reduce((t,x)=>t+((x&&x.best)||0),0);
-const lbData=()=>({best:S.best||0,et:etTotal(),pw:Math.round(power()),g:S.guild?S.guild.name.slice(0,24):null,t:Date.now()});
+const lbData=()=>({best:S.best||0,hb:(S.hard&&S.hard.best)||0,et:etTotal(),pw:Math.round(power()),g:S.guild?S.guild.name.slice(0,24):null,t:Date.now()});
 async function lbSync(force){
   if(PV.status!=='online'||!PV.canWrite||!PV.uid||PV.writing)return;
   const d=lbData(),k=JSON.stringify({...d,t:0}),now=Date.now();
@@ -1855,8 +1863,8 @@ function renderRank(){
   if(rsub==='pve'){
     const me={me:true,id:PV.uid||'me',lb:lbData()};
     const rows=(online?PV.docs.filter(x=>x.lb&&x.id!==PV.uid).map(x=>({...x})):[]).concat([me]);
-    const list=rows.map(x=>({me:x.me,label:lbName(x),sub:`Tours élémentaires : ${x.lb.et||0} étages · Puissance ${fmtN(x.lb.pw||0)}${x.lb.g?` · ${esc(x.lb.g)}`:''}`,v:x.lb.best||0,e:x.lb.et||0})).sort((a,b)=>b.v-a.v||b.e-a.e).slice(0,50);
-    body=`<section class="panel"><h2>Tour principale</h2>${st}${rankRows(list,x=>`Étage ${x.v}`)}<p class="note">Classement par record d’étage, puis par étages franchis dans les tours élémentaires. Mis à jour toutes les minutes.</p></section>`;
+    const list=rows.map(x=>({me:x.me,label:lbName(x),sub:`Tours élémentaires : ${x.lb.et||0} étages · Puissance ${fmtN(x.lb.pw||0)}${x.lb.g?` · ${esc(x.lb.g)}`:''}`,v:x.lb.best||0,h:x.lb.hb||0,e:x.lb.et||0})).sort((a,b)=>b.h-a.h||b.v-a.v||b.e-a.e).slice(0,50);
+    body=`<section class="panel"><h2>Tour principale</h2>${st}${rankRows(list,x=>x.h?`Difficile ${x.h}`:`Étage ${x.v}`)}<p class="note">Classement par record en Difficile, puis par record d’étage, puis par étages franchis dans les tours élémentaires. Mis à jour toutes les minutes.</p></section>`;
   }
   if(rsub==='pvp'){
     const season=(online?PV.docs.filter(x=>x.sp):[]).map(x=>({me:x.id===PV.uid,label:lbName({...x,me:x.id===PV.uid}),v:x.sp})).sort((a,b)=>b.v-a.v).slice(0,50);
@@ -2981,19 +2989,75 @@ function renderHome(){
   </section>`;
 }
 
+
+/* ---------- Tour principale : mode Difficile (débloqué après l'étage 250) ---------- */
+let tmode='normal';
+const hardOn=()=>(S.best||0)>=TOWER_MAX;
+const hardEq=f=>Math.round(245+1.2*f);
+function genHardFoes(f){
+  const e=hardEq(f),sc=scHard(scMain(e))*(f===TOWER_MAX?1.25:1),fe=[randEl(),randEl()];
+  if(f%10===0){const b=f===TOWER_MAX?'Souverain de la Tour':BOSSES[(f/10-1)%BOSSES.length];return[{n:b,hp:Math.round(380*sc),atk:Math.round(17*sc),def:Math.round(7*sc),spd:8,boss:true,el:fe[0],lv:e}]}
+  return Array.from({length:5},()=>{const t=pick(FOES);return{n:t.n,hp:Math.round(t.hp*sc),atk:Math.round(t.atk*sc),def:Math.round(t.def*sc),spd:t.spd,el:pick(fe),lv:e}});
+}
+function hardState(){if(!S.hard)S.hard={floor:1,best:0,foes:null};if(!S.hard.foes&&S.hard.floor<=TOWER_MAX)S.hard.foes=genHardFoes(S.hard.floor);return S.hard}
+function climbHard(){
+  if(busy||!hardOn())return;const H=hardState();
+  if(H.floor>TOWER_MAX)return toast('Vous avez terminé la Tour en Difficile !');
+  const party=partyHeroes().filter(h=>h.hp>0);if(!party.length)return toast('Aucun héros en état de combattre dans l’équipe.');
+  const f=H.floor;seeFoes(H.foes,`Tour Difficile, étage ${f}`);
+  const sum={floor:f,win:false,fallen:[],levels:[],gems:0,gold:0,loot:[],label:`Difficile, étage ${f}`};
+  startBattle(party,H.foes,S.slots,sum,res=>{sum.win=res.win;
+    casualties(res,sum,`Difficile, étage ${f}`);
+    sum.head=res.win?`Étage ${f} Difficile conquis !`:`Repoussés à l’étage ${f} Difficile.`;
+    if(res.win){rareDrop(sum);
+      const boss=f%10===0;
+      sum.gems=60+f*3+(boss?200:0);sum.gold=Math.round((400+f*40+(boss?2000:0))*goldMul());sum.shards=boss?20+Math.floor(f/5):0;
+      S.gems+=sum.gems;S.gold+=sum.gold;S.shards+=sum.shards;if(boss)sum.tomes=giveTomes(f%50===0?2:1);
+      grantXp(party,200+f*12,sum);track('climb');
+      H.floor++;H.best=Math.max(H.best,f);
+      if(f>=TOWER_MAX){S.gems+=5000;S.gold+=100000;S.shards+=500;S.tears=(S.tears||0)+1;giveTomes(5);sum.done='Tour Difficile terminée ! Récompense finale : +5 000 cristaux, +100 000 or, +500 éclats, +5 Tomes de maîtrise et 1 Larme de l’Oracle.'}
+      H.foes=H.floor>TOWER_MAX?[]:genHardFoes(H.floor);
+    }},'tower');
+}
+function towerModeChips(){return hardOn()?`<div class="tmode" role="tablist"><button role="tab" data-act="tmode" data-id="normal" aria-selected="${tmode==='normal'}">Normal</button><button role="tab" class="hard" data-act="tmode" data-id="hard" aria-selected="${tmode==='hard'}">Difficile · ${Math.min(TOWER_MAX,hardState().best)}/${TOWER_MAX}</button></div>`:''}
+function renderTowerHard(){
+  const H=hardState(),f=H.floor,boss=f%10===0,foes=H.foes||[],names=labelFoes(foes);
+  const party=partyHeroes(),able=party.some(h=>h.hp>0),hurt=S.heroes.some(h=>h.hp<stats(h).hp);
+  const counters=[...new Set(foes.map(x=>Object.keys(ELEM).find(k=>ELEM[k].beats===x.el)).filter(Boolean))];
+  const nb=f>TOWER_MAX?0:boss?{g:60+f*3+200,o:400+f*40+2000}:{g:60+f*3,o:400+f*40};
+  return`${towerModeChips()}<section class="panel hardp">
+    <div class="floorhead">
+      <div class="floorno"><small>Difficile · étage sur ${TOWER_MAX}</small>${f>TOWER_MAX?'Fin':f}${boss?'<br><span class="bosstag">Gardien d’étage</span>':''}</div>
+      <div class="row">
+        <button class="btn" data-act="rest" ${busy||!hurt||S.gold<restCost()?'disabled':''}>Auberge · ${restCost()} or</button>
+        <button class="btn" data-act="bmode" aria-pressed="${isManual()}">${isManual()?'Combat : manuel':'Combat : auto'}</button>
+        <button class="btn prime hardbtn" data-act="climbh" ${busy||!able||f>TOWER_MAX?'disabled':''}>${f>TOWER_MAX?'Tour Difficile terminée':'Combattre !'}</button>
+      </div>
+      <p class="permadeath">${ui('memorial')}<span><b>Mode Difficile</b> : 5 ennemis à chaque étage, tous capables d’étourdir et d’affaiblir vos héros. La mort reste définitive.</span></p>
+    </div>
+    <div class="foes">${foes.map((x,i)=>`<div class="foe${x.boss?' boss':''}">${elChip(x.el)} <b>${names[i]}</b> <span class="muted">PV ${fmtN(x.hp)} · ATQ ${fmtN(x.atk)}</span></div>`).join('')}</div>
+    ${f<=TOWER_MAX?`<p class="note">Efficace contre cet étage : ${counters.map(elChip).join(' ')} · Récompense : ${fmtN(nb.g)} cristaux, ${fmtN(nb.o)} or${boss?`, des éclats et ${f%50===0?2:1} Tome${f%50===0?'s':''} de maîtrise`:''}.</p>`:''}
+    <p class="note">Il faut une équipe au sommet (héros 6★ niveau 60, doublons, équipement SS +15 et bons sets) pour aller au bout. Record : étage ${H.best}.</p>
+  </section>
+  ${lastBattle&&lastBattle.mode==='tower'?renderBattle():''}
+  ${renderFormation()}
+  ${renderSynergies(party)}`;
+}
+
 function renderTower(){
+  if(!hardOn())tmode='normal';if(tmode==='hard')return renderTowerHard();
   const f=S.floor,boss=f%10===0,names=labelFoes(S.foes);
   const party=partyHeroes(),able=party.some(h=>h.hp>0);
   const hurt=S.heroes.some(h=>h.hp<stats(h).hp);
   const counters=[...new Set(S.foes.map(x=>Object.keys(ELEM).find(k=>ELEM[k].beats===x.el)).filter(Boolean))];
   const act=teamSyn(party).filter(s=>s.tier);
-  return`<section class="panel">
+  return`${towerModeChips()}<section class="panel">
     <div class="floorhead">
       <div class="floorno"><small>Étage actuel · sur ${TOWER_MAX}</small>${f>TOWER_MAX?'Fin':f}${boss?'<br><span class="bosstag">Gardien d’étage</span>':''}</div>
       <div class="row">
         <button class="btn" data-act="rest" ${busy||!hurt||S.gold<restCost()?'disabled':''}>Auberge · ${restCost()} or</button>
 <button class="btn" data-act="bmode" aria-pressed="${isManual()}">${isManual()?'Combat : manuel':'Combat : auto'}</button>
-        <button class="btn prime" data-act="climb" ${busy||!able||f>TOWER_MAX?'disabled':''}>${f>TOWER_MAX?'Tour terminée':'Combattre !'}</button>
+        <button class="btn prime" data-act="climb" ${busy||!able||f>TOWER_MAX?'disabled':''}>${f>TOWER_MAX?'Tour terminée':'Combattre !'}</button>${f>TOWER_MAX?'<button class="btn hardbtn" data-act="tmode" data-id="hard">Passer en Difficile</button>':''}
       </div>
       <p class="permadeath">${ui('memorial')}<span><b>Mort définitive</b> : un héros à 0 PV rejoint le Mémorial. Soignez l’équipe à l’Auberge avant les étages difficiles.</span></p>
     </div>
@@ -3056,7 +3120,7 @@ function renderBattle(){
   const lines=b.res.ev.slice(0,shown).map(e=>`<p class="${e.c}">${e.t}</p>`).join('');
   const s=b.sum;
   const lootHtml=s.loot&&s.loot.length?`<div><b>Butin</b></div><div class="loot">${s.loot.map(id=>{const it=itemById(id);return it?itemCard(it,'mini'):''}).join('')}</div>`:'';
-  const head=s.head||(s.floor!=null?(s.win?`Étage ${s.floor} conquis !`:`Repoussés à l’étage ${s.floor}.`):(s.win?`Victoire : ${s.label}`:`Défaite : ${s.label}`));
+  const head=s.head&&b.done?s.head:(s.floor!=null?(s.win?`Étage ${s.floor} conquis !`:`Repoussés à l’étage ${s.floor}.`):(s.win?`Victoire : ${s.label}`:`Défaite : ${s.label}`));
   const summary=b.done?`<div class="summary">
     <div><b>${head}</b>${s.gems||s.gold?` ${[s.gems?`+${s.gems} cristaux`:'',s.gold?`+${s.gold} or`:''].filter(Boolean).join(' · ')}`:''}</div>
     ${s.note?`<div class="muted">${s.note}</div>`:''}
@@ -3607,6 +3671,8 @@ document.addEventListener('click',e=>{
     case 'trem':leaveTrain(n);break;
     case 'tunlock':unlockTrain();break;
     case 'climb':climb();break;
+    case 'climbh':climbHard();break;
+    case 'tmode':tmode=id;window.scrollTo(0,0);render();break;
     case 'rest':rest();break;
     case 'daily':claimDaily();break;
     case 'fav':cycleFav();break;
