@@ -580,6 +580,23 @@ img.art{display:block;width:100%;height:100%;object-fit:cover;object-position:50
 img.art.foe{object-position:50% 50%}
 .skhead{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:2px}
 .skhead b{min-width:0}
+.leadbtn{position:absolute;top:-7px;left:-7px;width:26px;height:26px;border-radius:50%;padding:0;font-size:14px;line-height:22px;z-index:1;background:#0b1730;border:2px solid #4a6a90;color:#6f86a6;cursor:pointer}
+.leadbtn.on{background:linear-gradient(180deg,#ffe27a,#d39a35);border-color:#fff3c4;color:#3a2500;box-shadow:0 0 10px rgba(255,211,90,.7)}
+.leadbtn:hover:not(.on){color:#ffd35a;border-color:#ffd35a}
+.bar i{background:linear-gradient(180deg,#9ef0a8,#3fae58)}
+.bar i.mid{background:linear-gradient(180deg,#ffd98a,#e09a2a)}
+.bar i.low{background:linear-gradient(180deg,#ff9a8a,#d0372a)}
+.ebar i,.afkbar i{background:linear-gradient(180deg,#8fe6ff,#2b8fd8)}
+.atb{height:4px;margin-top:2px;background:rgba(0,0,0,.45)}
+.atb i{background:linear-gradient(90deg,#7c5cff,#c9a6ff)}
+.r6 .stars,.stars.six{color:#ff5d7a;background:linear-gradient(90deg,#ffd35a,#ff5d7a,#c66bff);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;text-shadow:none;letter-spacing:0}
+.hero.r6{border-color:#ff5d7a;box-shadow:0 0 22px -4px rgba(255,93,122,.75),0 0 0 1px rgba(255,211,90,.5)}
+.tslot.r6{border-color:#ff5d7a}
+.dups{display:flex;gap:2px;margin-top:3px;font-size:12px;line-height:1}
+.dups i{font-style:normal;color:rgba(160,190,230,.22)}
+.dups i.on{color:#ffe27a;text-shadow:0 0 6px rgba(255,226,122,.9),0 0 12px rgba(255,180,80,.6);animation:twinkle 1.6s ease-in-out var(--d) infinite}
+@keyframes twinkle{0%,100%{opacity:1;transform:scale(1)}45%{opacity:.55;transform:scale(.8)}55%{opacity:1;transform:scale(1.25)}}
+@media (prefers-reduced-motion:reduce){.dups i.on{animation:none}}
 </style>
 
 <div class="app">
@@ -678,6 +695,15 @@ function syncParty(){S.party=S.slots.filter(Boolean)}
 function rowOf(id){const i=S.slots.indexOf(id);return i<0?null:i<3?'front':'back'}
 function removeFromTeam(id){S.slots=S.slots.map(x=>x===id?null:x);if(S.eslots)for(const k in S.eslots)S.eslots[k]=S.eslots[k].map(x=>x===id?null:x);syncParty()}
 const slotsOf=k=>k==='main'?S.slots:S.eslots[k];
+/* Chef de formation : choisi par le joueur, sinon le premier héros placé */
+function leadIdOf(sl){
+  if(!sl)return null;
+  if(typeof S!=='undefined'&&S){const fk=sl===S.slots?'main':Object.keys(S.eslots||{}).find(k=>S.eslots[k]===sl);
+    if(fk){const id=(S.leads||{})[fk];if(id!=null&&sl.includes(id))return id;return sl.find(x=>x!=null)}}
+  return sl[0];
+}
+const leadIdx=fk=>{const sl=slotsOf(fk),id=leadIdOf(sl);return id==null?-1:sl.indexOf(id)};
+function setLead(i){const sl=slotsOf(fkey),id=sl[i];if(id==null)return;S.leads=S.leads||{};S.leads[fkey]=id;save();render();const h=heroById(id);toast(`${h.name} devient chef : ${leadText(leaderOf(h))}.`)}
 function placeAuto(id){
   const h=heroById(id);if(!h||S.slots.includes(id)||inTrain(id)||S.slots.filter(Boolean).length>=5)return false;
   const pref=MELEE(h.cls)?[0,1,2,3,4,5]:[3,4,5,0,1,2],i=pref.find(i=>!S.slots[i]);
@@ -708,9 +734,9 @@ const tmul=t=>1+.3*(t-1);
 const mainVal=it=>Math.round(MAINV[it.main]*(TIERED.has(it.main)?tmul(it.tier):1)*(1+.12*(it.rar-1))*(1+.12*it.plus));
 const enhCost=it=>(it.plus+1)*10*it.rar;
 const sellValue=it=>15*it.rar*it.tier+it.plus*8*it.rar;
-const ENERGY_MAX=100,ENERGY_COST=10,INV_MAX=80,MAXPLUS=15,DUN_MAX=10;
-const ASC={1:30,2:60,3:120,4:250};
-const ascGold=h=>500*h.stars;
+const ENERGY_MAX=120,ENERGY_COST=8,EN_MS=40000,INV_MAX=80,MAXPLUS=15,DUN_MAX=10;
+const ASC={1:30,2:60,3:120,4:250,5:500};
+const ascGold=h=>h.stars>=5?10000:500*h.stars;
 const goldDunBase=L=>350+L*220;
 const shardBase=L=>6+L*4;
 const BASECRIT={tank:5,warrior:5,archer:15,mage:5,healer:5};
@@ -733,9 +759,9 @@ const TOWER_MAX=250;
 function diffMul(sc){const f=sc<=2.35?1+(sc-1)/.15:10+(sc-2.35)/.4;return f<=44?Math.max(1,1+.25*(f-5)/39):1.25+.0018*(f-44)}
 const scHard=sc=>sc*diffMul(sc);
 function scMain(f){return f<=10?1+.15*(f-1):2.35+.40*(f-10)}
-const MULT=[0,1,1.25,1.55,1.95,2.5];
+const MULT=[0,1,1.25,1.55,1.95,2.5,3.1],STAR_MAX=6;
 const RATES=[{s:5,p:2},{s:4,p:8},{s:3,p:20},{s:2,p:30},{s:1,p:40}];
-const PITY=60, COST1=100, COST10=900, AWK_MAX=5;
+const PITY=60, COST1=100, COST10=900, AWK_MAX=6;
 const ROSTER={'Aldric':'tank','Ysolde':'tank','Brann':'tank','Doran':'tank','Oskar':'tank','Ulric':'tank','Thessa':'tank','Orla':'tank','Joris':'tank','Ayla':'tank','Corvin':'warrior','Liv':'warrior','Kaen':'warrior','Talen':'warrior','Galen':'warrior','Arwel':'warrior','Nadja':'warrior','Vesna':'warrior','Faye':'warrior','Sven':'warrior','Lior':'archer','Wren':'archer','Yuren':'archer','Hael':'archer','Perrin':'archer','Zeph':'archer','Lysa':'archer','Kira':'archer','Inès':'archer','Séraphin':'mage','Cyra':'mage','Rhéa':'mage','Nox':'mage','Sorel':'mage','Quill':'mage','Edrin':'mage','Élodie':'mage','Tamsin':'mage','Mina':'mage','Bastien':'healer','Maëlis':'healer','Iro':'healer','Vale':'healer','Jun':'healer','Sena':'healer','Mireille':'healer','Anouk':'healer','Rurik':'healer'};
 const NAMES=Object.keys(ROSTER);
 const namesOf=c=>NAMES.filter(n=>ROSTER[n]===c);
@@ -839,12 +865,12 @@ function gearSum(h,none){
   return g;
 }
 function stats(h,noGear){
-  const c=CLASSES[h.cls],m=MULT[h.stars]*(1+.08*(h.lvl-1))*(1+.1*(h.awk||0))*(1+(h.noBonus?0:gBonus())),g=gearSum(h,noGear),tr=traitOf(h);
+  const c=CLASSES[h.cls],m=MULT[h.stars]*(1+.08*(h.lvl-1))*(1+(h.leg?.1:.06)*(h.awk||0))*(1+(h.noBonus?0:gBonus())),g=gearSum(h,noGear),tr=traitOf(h);
   if(tr)for(const x in tr.m)g[x]+=tr.m[x];
   return{hp:Math.round(c.hp*m*(1+g.hpp/100)+g.hp),atk:Math.round(c.atk*m*(1+g.atkp/100)+g.atk),def:Math.round(c.def*m*(1+g.defp/100)+g.def),
     spd:c.spd+h.stars+g.spd,crit:Math.min(100,BASECRIT[h.cls]+(h.leg==='ilyas'?25:0)+g.crit),cdmg:150+g.cdmg,pen:Math.min(80,g.pen),acc:Math.min(100,g.acc),res:Math.min(100,15+g.res)};
 }
-const capOf=h=>10+h.stars*8;
+const capOf=h=>h.stars>=6?60:10+h.stars*8;
 const xpNeed=l=>40+l*20;
 const trainCost=h=>20*h.lvl+15*h.stars;
 const dismissValue=h=>15*h.stars*h.stars+(h.awk||0)*60;
@@ -1008,7 +1034,7 @@ function battleNew(heroes,foes,slots,maxR,opt){
   const rowIn=(sl,id)=>{const i=sl.indexOf(id);return i>=3?'back':'front'};
   const U=[],names=labelFoes(foes);
   const mk=(h,side,sl)=>{const s=stats(h),row=rowIn(sl,h.id);return{side,id:h.id,name:h.name,cls:h.cls,leg:h.leg||null,seed:h.seed,stars:h.stars,hp:h.hp,max:s.hp,atk:s.atk,def:s.def,spd:s.spd,crit:s.crit,cdmg:s.cdmg,pen:s.pen,acc:s.acc||0,res:s.res==null?15:s.res,
-    alive:h.hp>0,turn:0,killer:null,el:h.el,row,rowMul:(row==='back'&&MELEE(h.cls))?.7:1,sk:skillsOf(h).map((x,i)=>h.pvpMerc?x:skillAt(x,skLv(h,i))),cd:[0,0,0],fx:[],atb:0,lead:sl[0]===h.id?leaderOf(h):null}};
+    alive:h.hp>0,turn:0,killer:null,el:h.el,row,rowMul:(row==='back'&&MELEE(h.cls))?.7:1,sk:skillsOf(h).map((x,i)=>h.pvpMerc?x:skillAt(x,skLv(h,i))),cd:[0,0,0],fx:[],atb:0,lead:leadIdOf(sl)===h.id?leaderOf(h):null}};
   heroes.forEach(h=>U.push(mk(h,'h',slots)));
   if(opt.foeHeroes){foes.forEach(h=>{const u=mk(h,'f',opt.foeSlots);u.pvp=true;U.push(u)});applySyn(U.filter(u=>u.side==='f'),teamSyn(foes))}
   else foes.forEach((f,i)=>{const lv=f.lv||0;U.push({side:'f',name:names[i],cls:'foe',hp:f.hp,max:f.hp,atk:f.atk,def:f.def,spd:f.spd,alive:true,turn:0,boss:!!f.boss,el:f.el,crit:f.crit||5,cdmg:f.cdmg||150,pen:f.pen!=null?f.pen:(f.boss?10:0),
@@ -1236,7 +1262,7 @@ function upcomingEvents(){const out=[];let c=evAt(dayIdx());for(let i=0;i<6;i++)
 function evBonus(key){if(!S)return false;return activeEvents().some(e=>e.def.type==='bonus'&&e.def.bonus===key)}
 function goldMul(){return evBonus('gold')?2:1}
 function shardMul(){return evBonus('shards')?2:1}
-function energyCost(){return evBonus('energy')?5:ENERGY_COST}
+function energyCost(){return evBonus('energy')?4:ENERGY_COST}
 const evMult=()=>1+S.best/250;
 function evp(inst){
   S.evp=S.evp||{};
@@ -1595,17 +1621,26 @@ function withSeed(seed,fn){const o=RNG;RNG=rng(seed);try{return fn()}finally{RNG
 function pvpLaw(d){return LAWS[Math.floor(rng(d*7717+3)()*LAWS.length)]}
 function pvpPool(d){
   const r=rng(d*1009+7),cls=['tank','warrior','archer','mage','healer'];
-  const cl=[...cls,...cls,cls[Math.floor(r()*5)],cls[Math.floor(r()*5)]];
-  const st=[5,5,4,4,4,3,3,3,3,2,2,2];
+  const cl=[...cls,...cls,...cls,cls[Math.floor(r()*5)],cls[Math.floor(r()*5)],cls[Math.floor(r()*5)]];
+  const st=[5,5,5,4,4,4,4,3,3,3,3,3,3,2,2,2,2,2];
   for(const a of [cl,st])for(let i=a.length-1;i>0;i--){const j=Math.floor(r()*(i+1));[a[i],a[j]]=[a[j],a[i]]}
   const els=['eau','feu','vent','terre','eau','feu','vent','terre','lumiere','ombre'];
   const pools={};Object.keys(CLASSES).forEach(c=>{pools[c]=namesOf(c).sort(()=>r()-.5)});
   return cl.map((c,i)=>({idx:i,name:pools[c].shift()||namesOf(c)[0],cls:c,stars:st[i],el:els[Math.floor(r()*els.length)],seed:Math.floor(r()*1e9)}));
 }
+const PVP_POOL=18,PVP_HAND=8;
+/* Tirage personnel : chaque joueur reçoit 8 mercenaires parmi les 18 du jour */
+function pvpHand(d,key){
+  const pool=pvpPool(d),r=rng(d*7919+Math.abs(hash(String(key)))%100000),pickN=(arr,n)=>{const a=arr.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(r()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a.slice(0,n)};
+  const hi=pool.filter(u=>u.stars>=4).map(u=>u.idx),mid=pool.filter(u=>u.stars===3).map(u=>u.idx),lo=pool.filter(u=>u.stars<=2).map(u=>u.idx);
+  return[...pickN(hi,3),...pickN(mid,3),...pickN(lo,2)].sort((a,b)=>a-b);
+}
+const myPvpKey=()=>PV.status==='online'&&PV.uid?PV.uid:'me';
 const pvpCost=(d,dr)=>dr.p.reduce((t,i)=>t+pvpPool(d)[i].stars,0);
-function validDraft(d,dr){
+function validDraft(d,dr,key){
   if(!dr||!Array.isArray(dr.p)||!Array.isArray(dr.b)||dr.p.length!==5)return false;
-  if(new Set(dr.p).size!==5||dr.p.some(i=>!Number.isInteger(i)||i<0||i>11))return false;
+  if(new Set(dr.p).size!==5||dr.p.some(i=>!Number.isInteger(i)||i<0||i>=PVP_POOL))return false;
+  if(key!=null){const h=pvpHand(d,key);if(dr.p.some(i=>!h.includes(i)))return false}
   const back=dr.b.filter(i=>dr.p.includes(i));
   return back.length<=3&&5-back.length<=3&&pvpCost(d,dr)<=PVP_BUDGET;
 }
@@ -1616,13 +1651,13 @@ function buildTeam(d,dr,pre){
   return{list,slots};
 }
 function botDraft(d,k){
-  const r=rng(d*331+k*97+5),pool=pvpPool(d);let best=null,bs=-1;
+  const r=rng(d*331+k*97+5),pool=pvpPool(d),hd=pvpHand(d,'bot'+k);let best=null,bs=-1;
   for(let t=0;t<60;t++){
-    const p=[...Array(12).keys()].sort(()=>r()-.5).slice(0,5);
+    const p=hd.slice().sort(()=>r()-.5).slice(0,5);
     const dr={p,b:p.filter(i=>!MELEE(pool[i].cls))};
     if(dr.b.length>3)dr.b=dr.b.slice(0,3);
     if(5-dr.b.length>3){const extra=p.filter(i=>!dr.b.includes(i)).slice(0,(5-dr.b.length)-3);dr.b.push(...extra)}
-    if(!validDraft(d,dr))continue;
+    if(!validDraft(d,dr,'bot'+k))continue;
     const sc=pvpCost(d,dr)+r()*3+teamSyn(dr.p.map(i=>pool[i])).reduce((t,s)=>t+s.tier,0);
     if(sc>bs){bs=sc;best=dr}
   }
@@ -1637,7 +1672,7 @@ function pvpLocal(){
 function pvpEntries(d){
   const out=[];for(let i=0;i<PVP_BOTS;i++){const dr=botDraft(d,i);if(dr)out.push({id:'bot'+i,bot:true,name:BOT_NAMES[(d+i)%BOT_NAMES.length],draft:dr})}
   if(PV.status==='online'){
-    for(const doc of PV.docs){const dr=doc.day===d?doc.draft:doc.prevDay===d?doc.prev:null;if(dr&&validDraft(d,dr))out.push({id:doc.id,me:doc.id===PV.uid,draft:dr,p:typeof doc.p==='string'?doc.p.slice(0,20):''})}
+    for(const doc of PV.docs){const dr=doc.day===d?doc.draft:doc.prevDay===d?doc.prev:null;if(dr&&validDraft(d,dr,doc.id))out.push({id:doc.id,me:doc.id===PV.uid,draft:dr,p:typeof doc.p==='string'?doc.p.slice(0,20):''})}
   }else{const L=pvpLocal(),dr=L.day===d?L.sub:L.prevDay===d?L.prev:null;if(dr)out.push({id:'me',me:true,draft:dr})}
   return out;
 }
@@ -1685,6 +1720,7 @@ async function pvpNames(){
 }
 function pvpToggle(i){
   const L=pvpLocal(),w=L.work,d=L.day;
+  if(!pvpHand(d,myPvpKey()).includes(i))return;
   if(w.p.includes(i)){w.p=w.p.filter(x=>x!==i);w.b=w.b.filter(x=>x!==i)}
   else{
     if(w.p.length>=5)return toast('Votre équipe compte déjà 5 mercenaires.');
@@ -1702,7 +1738,7 @@ function pvpRow(i){
 }
 async function pvpSubmit(){
   const L=pvpLocal(),d=L.day,dr={p:L.work.p.slice(),b:L.work.b.filter(i=>L.work.p.includes(i))};
-  if(!validDraft(d,dr))return toast('Équipe incomplète : choisissez 5 mercenaires dans le budget, 3 au maximum par ligne.');
+  if(!validDraft(d,dr,myPvpKey()))return toast('Équipe incomplète : choisissez 5 mercenaires dans le budget, 3 au maximum par ligne.');
   if(L.edits>=PVP_EDITS)return toast('Plus de modifications possibles aujourd’hui.');
   if(PV.status==='online'){
     if(!PV.canWrite)return toast('Vous pouvez voir le classement, mais pas y inscrire d’équipe sur ce partage.');
@@ -1939,7 +1975,8 @@ const MISSIONS=[
   {k:'etower',n:'Gagner un combat dans une tour élémentaire',t:1,need:()=>S.best>=ET_UNLOCK},
   {k:'equip',n:'Équiper une pièce sur un héros',t:1}
 ];
-const DM_RW={gems:40,gold:400},DM_CHEST={gems:150,gold:1000,shards:15,tomes:2};
+const DM_RW={gems:40,gold:400,energy:10},DM_CHEST={gems:150,gold:1000,shards:15,tomes:2,energy:40};
+const giveEnergy=n=>{S.energy=Math.min(ENERGY_MAX*2,(S.energy||0)+n)};
 function dailyMissions(){
   const d=dayIdx();
   if(!S.dm||S.dm.day!==d){
@@ -1950,11 +1987,11 @@ function dailyMissions(){
 }
 function claimMission(k){
   const dm=dailyMissions(),m=MISSIONS.find(x=>x.k===k);if(!m||dm.claimed[k]||(dm.prog[k]||0)<m.t)return;
-  dm.claimed[k]=true;S.gems+=DM_RW.gems;S.gold+=DM_RW.gold;sfx('coin');save();render();toast(`Mission terminée : +${DM_RW.gems} cristaux, +${DM_RW.gold} or.`);
+  dm.claimed[k]=true;S.gems+=DM_RW.gems;S.gold+=DM_RW.gold;giveEnergy(DM_RW.energy);sfx('coin');save();render();toast(`Mission terminée : +${DM_RW.gems} cristaux, +${DM_RW.gold} or, +${DM_RW.energy} énergie.`);
 }
 function claimChest(){
   const dm=dailyMissions();if(dm.chest||!dm.list.every(k=>dm.claimed[k]))return;
-  dm.chest=true;S.gems+=DM_CHEST.gems;S.gold+=DM_CHEST.gold;S.shards+=DM_CHEST.shards;giveTomes(DM_CHEST.tomes);sfx('win');save();render();toast(`Coffre du jour : +${DM_CHEST.gems} cristaux, +${DM_CHEST.gold} or, +${DM_CHEST.shards} éclats, +${DM_CHEST.tomes} Tomes de maîtrise.`);
+  dm.chest=true;S.gems+=DM_CHEST.gems;S.gold+=DM_CHEST.gold;S.shards+=DM_CHEST.shards;giveTomes(DM_CHEST.tomes);giveEnergy(DM_CHEST.energy);sfx('win');save();render();toast(`Coffre du jour : +${DM_CHEST.gems} cristaux, +${DM_CHEST.gold} or, +${DM_CHEST.shards} éclats, +${DM_CHEST.tomes} Tomes de maîtrise, +${DM_CHEST.energy} énergie.`);
 }
 const GUIDE=[
   {n:'Invoquer 10 héros au portail',go:'summon',chk:()=>S.pulls>=10,rw:{gems:200}},
@@ -1980,7 +2017,8 @@ const ACH=[
   ...[50,200,500].map((n,i)=>({id:'pull'+n,n:`Invoquer ${n} héros`,chk:()=>S.pulls>=n,rw:{gems:[100,200,400][i]}})),
   {id:'p15',n:'Améliorer une pièce jusqu’à +15',chk:()=>S.inv.some(i=>i.plus>=15),rw:{gems:300}},
   {id:'ss',n:'Obtenir une pièce de rang SS',chk:()=>S.inv.some(i=>i.rar===6),rw:{gems:300}},
-  {id:'asc5',n:'Faire monter un héros à 5★ par ascension',chk:()=>S.heroes.some(h=>h.asc&&h.stars===5),rw:{gems:300}},
+  {id:'asc5',n:'Faire monter un héros à 5★ par ascension',chk:()=>S.heroes.some(h=>h.asc&&h.stars>=5),rw:{gems:300}},
+  {id:'asc6',n:'Faire monter un héros à 6★',chk:()=>S.heroes.some(h=>h.stars>=6),rw:{gems:500,tomes:3}},
   {id:'g5',n:'Guilde niveau 5',chk:()=>S.guild&&S.guild.lvl>=5,rw:{gems:200}},
   {id:'g10',n:'Guilde niveau 10',chk:()=>S.guild&&S.guild.lvl>=10,rw:{gems:400}},
   {id:'et50',n:'Atteindre l’étage 50 d’une tour élémentaire',chk:()=>Object.values(S.et||{}).some(t=>t.best>=50),rw:{gems:300}},
@@ -1990,7 +2028,7 @@ const ACH=[
 ];
 function claimAch(id){
   S.ach=S.ach||{};const a=ACH.find(x=>x.id===id);if(!a||S.ach[id]||!a.chk())return;
-  S.ach[id]=true;S.gems+=a.rw.gems||0;sfx('coin');save();render();toast(`Succès débloqué : ${a.n} (+${a.rw.gems} cristaux).`);
+  S.ach[id]=true;S.gems+=a.rw.gems||0;giveTomes(a.rw.tomes||0);sfx('coin');save();render();toast(`Succès débloqué : ${a.n} (+${a.rw.gems} cristaux${a.rw.tomes?`, +${a.rw.tomes} Tomes de maîtrise`:''}).`);
 }
 function questAlert(){
   const dm=dailyMissions(),g=GUIDE[guideIdx()];
@@ -2104,7 +2142,7 @@ function unlockTrain(){
 function ascend(id){
   const h=heroById(id);if(!h)return;
   if(busy)return toast('Attendez la fin du combat.');
-  if(h.stars>=5)return;
+  if(h.stars>=STAR_MAX)return;
   const c=ASC[h.stars],g=ascGold(h);
   if(S.shards<c)return toast('Pas assez d’éclats d’étoile.');
   if(S.gold<g)return toast('Pas assez d’or.');
@@ -2206,8 +2244,8 @@ function sellItem(id){
 function tickEnergy(){
   if(!S)return;const now=Date.now();
   if(S.energy>=ENERGY_MAX){S.energyT=now;return}
-  const g=Math.floor((now-S.energyT)/60000);
-  if(g>0){S.energy=Math.min(ENERGY_MAX,S.energy+g);S.energyT+=g*60000;if(S.energy>=ENERGY_MAX)S.energyT=now}
+  const g=Math.floor((now-S.energyT)/EN_MS);
+  if(g>0){S.energy=Math.min(ENERGY_MAX,S.energy+g);S.energyT+=g*EN_MS;if(S.energy>=ENERGY_MAX)S.energyT=now}
 }
 function lootWeights(L){const w6=L>=7?(L-6)*.6:0,w5=1+.8*L,w4=4+1.6*L,w3=14+2*L,w2=30;return[100-w2-w3-w4-w5-w6,w2,w3,w4,w5,w6]}
 function rollRar(L){const w=lootWeights(L);let r=R()*100;for(let i=5;i>=0;i--){if(r<w[i])return i+1;r-=w[i]}return 1}
@@ -2225,7 +2263,7 @@ function runDungeon(k){
   const d=DUNGEONS.find(x=>x.k===k);if(!d)return;
   const L=S.dunSel[k],party=partyHeroes().filter(h=>h.hp>0);
   if(!party.length)return toast('Aucun héros en état de combattre dans l’équipe.');
-  if(S.energy<energyCost())return toast('Pas assez d’énergie. Elle remonte de 1 par minute.');
+  if(S.energy<energyCost())return toast('Pas assez d’énergie. Elle remonte de 3 toutes les 2 minutes ; les missions du jour en donnent aussi.');
   S.energy-=energyCost();track('dungeon');
   seeFoes(dunFoes(k),d.n);const label=`${d.n} niv. ${L}`;
   const sum={label,win:false,fallen:[],levels:[],gems:0,gold:0,loot:[],sold:0};
@@ -2390,11 +2428,25 @@ function sortedHeroes(){return S.heroes.slice().sort((a,b)=>b.stars-a.stars||b.a
 function favHero(){return heroById(S.fav)||sortedHeroes()[0]||null}
 function cycleFav(){const l=sortedHeroes();if(!l.length)return;const cur=favHero(),i=l.indexOf(cur);S.fav=l[(i+1)%l.length].id;save();render()}
 
-const starsHtml=n=>`<div class="stars" aria-label="${n} étoiles">${'★'.repeat(n)}<span>${'★'.repeat(5-n)}</span></div>`;
+const starsHtml=n=>n>=6?`<div class="stars six" aria-label="6 étoiles">${'★'.repeat(6)}</div>`:`<div class="stars" aria-label="${n} étoiles">${'★'.repeat(n)}<span>${'★'.repeat(5-n)}</span></div>`;
 function hpBar(hp,max){const p=Math.round(hp/max*100);return`<div class="hp"><div class="lab"><span>PV</span><span>${hp}/${max}</span></div><div class="bar"><i class="${p<30?'low':p<60?'mid':''}" style="width:${p}%"></i></div></div>`}
 const elChip=e=>e&&ELEM[e]?`<span class="el" style="--c:${ELEM[e].c}">${ELEM[e].n}</span>`:'';
 const skillBox=L=>`<div class="skill"><b>${L.skill}</b>${L.desc}</div>`;
-const awkTag=h=>h.awk?` <span class="tag gold">Éveil ${h.awk}</span>`:'';
+const awkTag=h=>'';
+const dupStars=h=>{const n=h.awk||0;return`<div class="dups" role="img" aria-label="Doublons ${n}/${AWK_MAX}" title="Doublons fusionnés : ${n}/${AWK_MAX} (+${Math.round((h.leg?10:6)*n)} % PV, ATQ, DÉF)">${Array.from({length:AWK_MAX},(_,i)=>`<i class="${i<n?'on':''}" style="--d:${(i*.23).toFixed(2)}s">✦</i>`).join('')}</div>`};
+/* Fusion de doublons : un autre exemplaire du même personnage, hors équipe et entraînement */
+const inAnyTeam=id=>S.slots.includes(id)||Object.values(S.eslots||{}).some(a=>a&&a.includes(id));
+const dupsOf=h=>h.leg?[]:S.heroes.filter(x=>x.id!==h.id&&!x.leg&&x.name===h.name&&x.cls===h.cls&&!inAnyTeam(x.id)&&!inTrain(x.id)).sort((a,b)=>a.stars-b.stars||a.lvl-b.lvl||(a.awk||0)-(b.awk||0));
+let dupAsk=null;
+function dupFuse(id){
+  const h=heroById(id);if(!h||busy||h.leg||(h.awk||0)>=AWK_MAX)return;
+  const m=dupsOf(h)[0];if(!m)return toast(`Aucun autre ${h.name} disponible (hors équipe et entraînement).`);
+  if(dupAsk!==id){dupAsk=id;render();setTimeout(()=>{if(dupAsk===id){dupAsk=null;render()}},4000);return}
+  dupAsk=null;
+  withRatio(h,()=>{h.awk=(h.awk||0)+1});h.lvl=Math.max(h.lvl,m.lvl);
+  unequipAll(m.id);removeTrain(m.id);S.heroes=S.heroes.filter(x=>x.id!==m.id);removeFromTeam(m.id);
+  sfx('ult');save();render();toast(`${h.name} absorbe son doublon : ${h.awk}/${AWK_MAX} étoiles de doublon, +${h.awk*6} % PV, ATQ et DÉF.`);
+}
 
 function heroCard(h,mode,note,delay){
   const s=stats(h),cap=capOf(h),inP=S.party.includes(h.id),L=h.leg&&LEGENDS[h.leg];
@@ -2412,13 +2464,14 @@ function heroCard(h,mode,note,delay){
       <button class="btn sm" data-act="party" data-id="${h.id}" ${busy||inTrain(h.id)?'disabled':''}>${inP?'Retirer':'Équipe +'}</button>
       <button class="btn sm" data-act="train" data-id="${h.id}" ${busy||h.lvl>=cap||S.gold<trainCost(h)?'disabled':''}>Entraîner · ${trainCost(h)}</button>
       ${fuseBtn}
+      ${!h.leg&&(h.awk||0)<AWK_MAX&&dupsOf(h).length?`<button class="btn sm${dupAsk===h.id?' warn':' prime'}" data-act="dupfuse" data-id="${h.id}" ${busy?'disabled':''}>${dupAsk===h.id?`Confirmer : absorber ${dupsOf(h)[0].name} ${dupsOf(h)[0].stars}★ niv. ${dupsOf(h)[0].lvl}`:`Doublon ✦ (${dupsOf(h).length})`}</button>`:''}
       <button class="btn sm ${conf?'warn':''}" data-act="dismiss" data-id="${h.id}" ${busy?'disabled':''}>${conf?'Confirmer ?':'Renvoyer'}</button>
     </div>`;
   }
   const flag=mode==='full'&&inTrain(h.id)?'<span class="flag">Entraînement</span>':mode==='full'&&inP?'<span class="flag">Équipe</span>':note?`<span class="flag">${note}</span>`:'';
   return`<article class="hero r${h.stars}${fuseTarget===h.id&&mode==='full'?' fuse-on':''}"${style}>
     ${flag}<div class="pic">${portrait(h)}</div>
-    <div><div class="hname">${h.name}${awkTag(h)}</div>${L?`<div class="title">${L.title}</div>`:''}${starsHtml(h.stars)}</div>
+    <div><div class="hname">${h.name}${awkTag(h)}</div>${L?`<div class="title">${L.title}</div>`:''}${starsHtml(h.stars)}${dupStars(h)}</div>
     <div class="meta">${elChip(h.el)} ${CLASSES[h.cls].n} · Niv. ${h.lvl}${h.lvl>=cap?' (max)':''}</div>${traitOf(h)?`<div class="trait">${traitOf(h).n} · ${traitOf(h).d}</div>`:''}
     ${L?skillBox(L):''}
     ${mode==='pull'?'':hpBar(h.hp,s.hp)}
@@ -2477,7 +2530,7 @@ function renderHome(){
         <button class="qb" data-act="tab" data-id="tower">${ui('team')}<div><b>Formation</b><small>${S.party.length}/5 héros</small></div></button>
         <button class="qb" data-act="tab" data-id="dungeon">${ui('dungeon')}<div><b>Donjons</b><small>${S.energy}/${ENERGY_MAX} énergie</small></div></button>
       </div>
-      <button class="banner pvpb" data-act="tab" data-id="pvp"><div class="faces">${pvpPool(dayIdx()).slice(0,3).map(u=>`<div class="ava">${portrait({name:u.name,cls:u.cls,stars:u.stars,seed:u.seed})}</div>`).join('')}</div><div><b>Draft de l’Oracle</b><small>PvP · ${pvpLaw(dayIdx()).n} · ${pvpLocal().sub?'équipe inscrite':'composez votre équipe'}</small></div></button>
+      <button class="banner pvpb" data-act="tab" data-id="pvp"><div class="faces">${pvpHand(dayIdx(),myPvpKey()).slice(0,3).map(i=>pvpPool(dayIdx())[i]).map(u=>`<div class="ava">${portrait({name:u.name,cls:u.cls,stars:u.stars,seed:u.seed})}</div>`).join('')}</div><div><b>Draft de l’Oracle</b><small>PvP · ${pvpLaw(dayIdx()).n} · ${pvpLocal().sub?'équipe inscrite':'composez votre équipe'}</small></div></button>
       <button class="banner" data-act="tab" data-id="summon"><div class="faces">${faces}</div><div><b>Appel légendaire</b><small>5★ garanti dans ${PITY-S.pity} appels · ×10 = ${COST10} ◆</small></div></button>
     </div>
   </section>`;
@@ -2511,20 +2564,21 @@ function renderTower(){
 }
 
 function slotHtml(i){
-  const id=slotsOf(fkey)[i],h=id&&heroById(id),sel=selHero!=null&&selHero===id,target=selHero!=null&&!sel;
+  const isLead=leadIdx(fkey)===i,id=slotsOf(fkey)[i],h=id&&heroById(id),sel=selHero!=null&&selHero===id,target=selHero!=null&&!sel;
   if(!h)return`<div class="fslot empty${target?' target':''}"><button class="fbtn" data-act="slot" data-id="${i}" ${busy?'disabled':''}><span class="plus">+</span><span>${selHero!=null?'Placer ici':'Vide'}</span></button></div>`;
   const s=stats(h),p=Math.round(h.hp/s.hp*100),warn=i>=3&&MELEE(h.cls);
   return`<div class="fslot${sel?' sel':''}${target?' target':''}"><button class="fbtn" data-act="slot" data-id="${i}" ${busy?'disabled':''}>
-    <div class="ava">${portrait(h)}${i===0?'<span class="crown" title="Chef">♛</span>':''}</div><div class="fname">${h.name}</div>${starsHtml(h.stars)}${i===0?`<div class="fmeta lead">Chef · ${leadText(leaderOf(h)).replace(' pour toute l’équipe','')}</div>`:''}
+    <div class="ava">${portrait(h)}</div><div class="fname">${h.name}</div>${starsHtml(h.stars)}${isLead?`<div class="fmeta lead">Chef · ${leadText(leaderOf(h)).replace(' pour toute l’équipe','')}</div>`:''}
     <div class="fmeta">${elChip(h.el)}</div><div class="fmeta">${CLASSES[h.cls].n} · niv. ${h.lvl}</div>
     <div class="bar"><i class="${p<30?'low':p<60?'mid':''}" style="width:${p}%"></i></div>${warn?'<div class="fwarn">−30 % de dégâts à l’arrière</div>':''}</button>
-    <button class="x" data-act="unslot" data-id="${i}" aria-label="Retirer ${h.name}" ${busy?'disabled':''}>×</button></div>`;
+    <button class="x" data-act="unslot" data-id="${i}" aria-label="Retirer ${h.name}" ${busy?'disabled':''}>×</button>
+    <button class="leadbtn${isLead?' on':''}" data-act="setlead" data-id="${i}" aria-label="${isLead?h.name+' est le chef':'Nommer '+h.name+' chef'}" aria-pressed="${isLead}" title="${isLead?'Chef de l’équipe':'Nommer chef'}" ${busy?'disabled':''}>♛</button></div>`;
 }
 function renderFormation(){
   const fsl=slotsOf(fkey),bench=sortedHeroes().filter(h=>!fsl.includes(h.id)&&!inTrain(h.id)&&(fkey==='main'||h.el===fkey));
   const selH=selHero!=null&&heroById(selHero);
   return`<section class="panel"><h2>Formation${fkey==='main'?'':' '+ELEM[fkey].n} · ${fsl.filter(Boolean).length}/5</h2>
-    <p class="hint">${selH?`<b>${selH.name}</b> est sélectionné : touchez un emplacement pour le placer ou l’échanger.`:'Touchez un héros, puis un emplacement, pour le placer. Deux héros de l’équipe s’échangent leur place.'}</p>
+    <p class="hint">${selH?`<b>${selH.name}</b> est sélectionné : touchez un emplacement pour le placer ou l’échanger.`:'Touchez un héros, puis un emplacement, pour le placer. Deux héros de l’équipe s’échangent leur place. La couronne ♛ sur une case nomme le chef de l’équipe.'}</p>
     <div class="rowlab"><b>Ligne avant</b><span>Reçoit 85 % des attaques ciblées</span></div>
     <div class="frow">${[0,1,2].map(slotHtml).join('')}</div>
     <div class="rowlab"><b>Ligne arrière</b><span>Protégée · idéale pour Archers, Mages, Soigneurs</span></div>
@@ -2655,11 +2709,11 @@ function renderSheet(){
       :`<button class="gs empty${on}" data-act="gslot" data-id="${sl.k}"><span class="iic">${gi(sl.k)}</span><span class="gn">${sl.n}</span><span class="gm muted">Vide</span></button>`}).join('');
   return`<section class="panel"><button class="btn sm" data-act="closesheet">‹ Retour à la guilde</button>
     <div class="sheethead" style="margin-top:12px"><div class="pic">${portrait(h)}</div>
-      <div style="display:grid;gap:5px;min-width:0"><div class="hname" style="font-size:22px">${h.name}${awkTag(h)}</div>${L?`<div class="title">${L.title}</div>`:''}${starsHtml(h.stars)}
+      <div style="display:grid;gap:5px;min-width:0"><div class="hname" style="font-size:22px">${h.name}${awkTag(h)}</div>${L?`<div class="title">${L.title}</div>`:''}${starsHtml(h.stars)}${dupStars(h)}
       <div class="meta">${elChip(h.el)} ${CLASSES[h.cls].n} · Niv. ${h.lvl}</div>${hpBar(h.hp,s.hp)}</div></div>
     ${L?`<div style="margin-top:10px">${skillBox(L)}</div>`:''}${traitOf(h)?`<div class="trait" style="margin-top:8px">Trait ${traitOf(h).n} · ${traitOf(h).d}</div>`:''}
     <h2 style="margin-top:14px">Compétences</h2><p class="meta" style="margin:0 0 6px">Tomes de maîtrise : <b>${S.tomes||0}</b> · ils s’obtiennent tous les 10 étages de la Tour et des tours élémentaires, au coffre des missions du jour, dans le guide et à la 1ʳᵉ place du Draft.</p><div class="sklist">${skillsOf(h).map((k0,i)=>{const l=skLv(h,i),k=skillAt(k0,l),c=SK_COST[l+1];return`<div class="skill"><div class="skhead"><b>${i+1}. ${k.n} · Niv. ${l}/${SK_MAX}${k.cd?` · recharge ${k.cd} tours`:''}</b>${l<SK_MAX?`<button class="btn sm${(S.tomes||0)>=c?' prime':''}" data-act="skup" data-id="${h.id}:${i}" ${(S.tomes||0)>=c?'':'disabled'}>Améliorer · ${c} tome${c>1?'s':''}</button>`:'<span class="good">Max</span>'}</div>${k0.d}${l<SK_MAX?`<div class="meta">Niveau ${l+1} : ${skStep(k0,l+1)}</div>`:''}</div>`}).join('')}
-      <div class="skill lead"><b>♛ Chef · ${leadText(leaderOf(h))}</b>S’applique quand ce héros occupe la première case de la formation (avant gauche).</div></div>
+      <div class="skill lead"><b>♛ Chef · ${leadText(leaderOf(h))}</b>S’applique quand ce héros est nommé chef : touchez la couronne ♛ sur sa case dans la formation.</div></div>
     <h2 style="margin-top:14px">Statistiques</h2>
     <div class="statgrid">${row('PV','hp')}${row('ATQ','atk')}${row('DÉF','def')}${row('VIT','spd')}${row('Taux crit','crit',1)}${row('Dég. crit','cdmg',1)}${row('Pénétration','pen',1)}${row('Précision','acc',1)}${row('Résistance','res',1)}</div>
     <p class="note">En vert : le bonus apporté par l’équipement. La pénétration ignore une partie de la DÉF ennemie. La Précision aide vos effets négatifs à passer, la Résistance aide à repousser ceux de l’ennemi (15 % de chance minimum de résister).</p>
@@ -2671,13 +2725,13 @@ function renderSheet(){
     ${pickSlot?renderPicker(h):''}`;
 }
 function ascBlock(h){
-  if(h.stars>=5)return`<h2 style="margin-top:14px">Ascension</h2><p class="note" style="margin-top:0">${h.name} a atteint 5★, le maximum.</p>`;
+  if(h.stars>=STAR_MAX)return`<h2 style="margin-top:14px">Ascension</h2><p class="note" style="margin-top:0">${h.name} a atteint 6★, le maximum : niveau 60 débloqué.</p>`;
   const c=ASC[h.stars],g=ascGold(h),ok=S.shards>=c&&S.gold>=g;
   return`<h2 style="margin-top:14px">Ascension</h2><div class="ascbox">
-    <div><div class="hname" style="font-size:17px">${h.stars}★ → ${h.stars+1}★</div><div class="meta">PV, ATQ et DÉF ×${(MULT[h.stars+1]/MULT[h.stars]).toFixed(2).replace('.',',')} · VIT +1 · niveau max ${capOf(h)} → ${capOf(h)+8}</div></div>
+    <div><div class="hname" style="font-size:17px">${h.stars}★ → ${h.stars+1}★</div><div class="meta">PV, ATQ et DÉF ×${(MULT[h.stars+1]/MULT[h.stars]).toFixed(2).replace('.',',')} · VIT +1 · niveau max ${capOf(h)} → ${capOf({stars:h.stars+1})}</div></div>
     <div class="ascost"><span class="${S.shards>=c?'good':'bad'}">${STARIC} ${S.shards}/${c} éclats</span><span class="${S.gold>=g?'good':'bad'}">${COIN} ${g.toLocaleString('fr-FR')} or</span></div>
     <div><button class="btn prime" data-act="asc" data-id="${h.id}" ${!ok||busy?'disabled':''}>Faire l’ascension</button></div></div>
-    <p class="note">Les éclats d’étoile s’obtiennent dans le donjon « Sanctuaire des étoiles ». Un héros monté à 5★ par ascension n’a pas de compétence unique : elles restent réservées aux légendaires.</p>`;
+    <p class="note">Les éclats d’étoile s’obtiennent dans le donjon « Sanctuaire des étoiles ». Un héros monté à 5★ par ascension n’a pas de compétence unique : elles restent réservées aux légendaires. Le passage à 6★ (500 éclats, 10 000 or) débloque le niveau 60, pour tous les héros, légendaires compris.</p>`;
 }
 function renderPicker(h){
   const sl=SLOT[pickSlot],cur=S.inv.find(i=>i.by===h.id&&i.slot===pickSlot);
@@ -2710,7 +2764,7 @@ function renderDungeon(){
       <div class="row"><button class="btn" data-act="bmode" aria-pressed="${isManual()}">${isManual()?'Combat : manuel':'Combat : auto'}</button><button class="btn prime" data-act="drun" data-id="${d.k}" ${busy||S.energy<energyCost()||!party.some(h=>h.hp>0)?'disabled':''}>Entrer · ${energyCost()} énergie</button><span class="meta">${d.type==='gear'?`1 à 3 pièces · ${dunGold(L)} or`:d.type==='gold'?'Pas d’équipement, beaucoup d’or':`+ ${dunGold(L)} or`}</span></div>
     </section>`}).join('');
   return`<section class="panel"><div class="hp"><div class="lab"><span>Énergie</span><span id="energy">${S.energy}/${ENERGY_MAX}</span></div><div class="bar ebar"><i style="width:${Math.min(100,S.energy/ENERGY_MAX*100)}%"></i></div></div>
-    <p class="note">+1 énergie par minute, +50 avec le bonus du jour. Les donjons utilisent la formation de la Tour, et les héros peuvent y mourir aussi. Le rang SS n’apparaît qu’à partir du niveau 7.</p></section>
+    <p class="note">+3 énergie toutes les 2 minutes (plein en 1 h 20), +50 avec le bonus du jour, +10 par mission du jour et +40 avec leur coffre (l’énergie peut alors dépasser le maximum). Les donjons utilisent la formation de la Tour, et les héros peuvent y mourir aussi. Le rang SS n’apparaît qu’à partir du niveau 7.</p></section>
     ${lastBattle&&lastBattle.mode==='dungeon'?renderBattle():''}${cards}`;
 }
 
@@ -2787,7 +2841,7 @@ function bracketHtml(t){
     return`<div class="bcol"><div class="meta">${c}</div>${Array.from({length:8>>r},(_,i)=>{const n=l?l[i]:null,me=n&&t.ent[n].me,won=n&&nx&&nx.includes(n),lost=n&&nx&&!won;
       return`<div class="bk${me?' me':''}${won?' won':''}${lost?' lost':''}">${n||'?'}</div>`}).join('')}</div>`}).join('')}</div></div>`;
 }
-const fmtR=r=>[r.gems?`${r.gems} ◆`:'',r.gold?`${r.gold.toLocaleString('fr-FR')} or`:'',r.shards?`${r.shards} éclats`:'',r.item?'1 pièce rang S':'',r.tomes?`${r.tomes} Tome${r.tomes>1?'s':''} de maîtrise`:''].filter(Boolean).join(' · ');
+const fmtR=r=>[r.gems?`${r.gems} ◆`:'',r.gold?`${r.gold.toLocaleString('fr-FR')} or`:'',r.shards?`${r.shards} éclats`:'',r.item?'1 pièce rang S':'',r.tomes?`${r.tomes} Tome${r.tomes>1?'s':''} de maîtrise`:'',r.energy?`${r.energy} énergie`:''].filter(Boolean).join(' · ');
 function evBody(inst){
   const def=inst.def,p=evp(inst),pw=power(),rows=[];
   const desc={tour:'8 guildes, élimination directe en 3 tours. Les adversaires s’adaptent à votre puissance.',royale:'Un seul champion contre 15 autres, chacun pour soi. Dès le 4ᵉ tour, la tempête blesse tout le monde.',raid:`Infligez un maximum de dégâts à ${def.boss} en 12 tours. Il frappe toute la formation tous les 3 tours.`,survie:'Repoussez le plus de vagues possible. Les PV sont conservés d’une vague à l’autre (+20 % de soins entre deux vagues).',tresor:`Battez les gardiens pour gagner une pièce d’équipement de rang ${RANK[def.minRank||4]} minimum (${(def.slots||[]).map(k=>SLOT[k].n.toLowerCase()).join(', ')}).`}[def.type];
@@ -2907,7 +2961,9 @@ function renderGuild(){
 
 function renderPvp(){
   initPvp();
-  const L=pvpLocal(),d=L.day,pool=pvpPool(d),law=pvpLaw(d),w=L.work,cost=pvpCost(d,w),left=dayDate(d+1).getTime()-Date.now();
+  const L=pvpLocal(),d=L.day,pool=pvpPool(d),law=pvpLaw(d),w=L.work,myHand=pvpHand(d,myPvpKey());
+  if(w.p.some(i=>!myHand.includes(i))){w.p=w.p.filter(i=>myHand.includes(i));w.b=w.b.filter(i=>w.p.includes(i))}
+  const cost=pvpCost(d,w),left=dayDate(d+1).getTime()-Date.now();
   const T=pvpStandings(d),meIdx=T.findIndex(e=>e.me),me=T[meIdx];
   const st=PV.status==='online'?`<span class="good">En ligne · ${T.filter(e=>!e.bot).length} joueur${T.filter(e=>!e.bot).length>1?'s':''} inscrit${T.filter(e=>!e.bot).length>1?'s':''}</span>`:PV.status==='loading'||PV.status==='init'?'Connexion au classement…':PV.status==='slow'?'<span class="bad">Le classement en ligne ne répond pas encore.</span>':'<span class="bad">Hors ligne : vous affrontez uniquement les Ombres.</span>';
   const yT=pvpStandings(d-1),yMe=yT.findIndex(e=>e.me);
@@ -2921,17 +2977,17 @@ function renderPvp(){
   const rows=T.map((e,i)=>{const r=me&&!e.me?me.res[e.id]:null;return`<div class="srow${e.me?' mine':''}"><span class="meta">${i+1}</span><div class="mi"><b>${esc(entryName(e))}</b>${e.bot?' <span class="role">Ombre</span>':''}<div class="tteam mini">${buildTeam(d,e.draft,'v').list.map(h=>`<div class="ava" title="${h.name}">${portrait(h)}</div>`).join('')}</div></div><span class="spts">${e.pts} pts<br><span class="meta">${e.w}-${e.dr}-${e.l}</span></span>${r?`<button class="btn sm" data-act="pvpwatch" data-id="${e.id}" title="Revoir la première manche">${r[0]>r[1]?'V':r[0]<r[1]?'D':'N'} ${r[0]}-${r[1]}</button>`:''}</div>`}).join('');
   const season=PV.status==='online'?PV.docs.filter(x=>x.sp).sort((a,b)=>b.sp-a.sp).slice(0,15):[];
   return`<section class="panel"><h2>Draft de l’Oracle</h2>
-      <p class="hint" style="margin-bottom:8px">Chaque jour, tous les joueurs reçoivent les <b>mêmes 12 mercenaires</b>. Recrutez-en 5 avec un budget de <b>${PVP_BUDGET} étoiles</b>, placez-les, puis votre équipe affronte automatiquement l’équipe de chaque autre joueur, en deux manches. Victoire 3 points, nul 1 point. Si une manche dure trop longtemps, l’équipe qui garde le plus de PV (en %) la remporte. Le classement se fige à minuit.</p>
+      <p class="hint" style="margin-bottom:8px">Chaque jour, l’Oracle invoque 18 mercenaires et en confie <b>8 à chaque joueur, tirés au hasard</b> : vos adversaires n’ont pas les mêmes choix que vous. Recrutez-en 5 avec un budget de <b>${PVP_BUDGET} étoiles</b>, placez-les, puis votre équipe affronte automatiquement l’équipe de chaque autre joueur, en deux manches. Victoire 3 points, nul 1 point. Si une manche dure trop longtemps, l’équipe qui garde le plus de PV (en %) la remporte. Le classement se fige à minuit.</p>
       <div class="lawbox"><span class="typechip">Loi du jour</span><b>${law.n}</b><span class="meta">${law.d}</span></div>
       <div class="meta" style="margin-top:8px">${st} · fin dans ${fmtLeft(left)}</div></section>
     ${lastBattle&&lastBattle.mode==='pvp'?renderBattle():''}
     ${yCard}
-    <section class="panel"><h2>Mercenaires du jour · coût ${cost}/${PVP_BUDGET} ★ · ${w.p.length}/5</h2>
+    <section class="panel"><h2>Vos mercenaires du jour · coût ${cost}/${PVP_BUDGET} ★ · ${w.p.length}/5</h2>
       <div class="bar afkbar" style="margin-bottom:10px"><i style="width:${cost/PVP_BUDGET*100}%"></i></div>
-      <div class="bench">${pool.map(card).join('')}</div></section>
+      <div class="bench">${myHand.map(i=>pool[i]).map(card).join('')}</div></section>
     <section class="panel"><h2>Votre équipe</h2>${team}
       <div class="row" style="margin-top:10px"><button class="btn prime" data-act="pvpsubmit" ${w.p.length!==5||subOK||L.edits>=PVP_EDITS||!PV.canWrite?'disabled':''}>${L.sub?'Mettre à jour l’équipe':'Inscrire l’équipe'}</button><span class="meta">${subOK?'Équipe inscrite.':L.sub?'Modifications non envoyées.':''} ${PVP_EDITS-L.edits} modification${PVP_EDITS-L.edits>1?'s':''} restante${PVP_EDITS-L.edits>1?'s':''}</span></div>
-      <p class="note">Vos héros ne sont pas utilisés ici : tout le monde joue avec les mêmes mercenaires (niveau ${PVP_LVL}, sans équipement ni bonus de guilde). Les équipes adverses sont visibles : vous pouvez contre-drafter, mais elles aussi.</p></section>
+      <p class="note">Vos héros ne sont pas utilisés ici : tous les mercenaires sont au même niveau (${PVP_LVL}), sans équipement ni bonus de guilde. Chaque main contient toujours 3 mercenaires 4-5★, 3 de 3★ et 2 de 2★, donc une équipe complète est toujours possible. Les équipes adverses restent visibles.</p></section>
     <section class="panel"><h2>Classement du jour · ${T.length} équipes</h2>${me?'':'<p class="hint">Inscrivez une équipe pour entrer au classement.</p>'}<div class="stand">${rows}</div>
       <p class="note">Le score à droite est votre résultat contre chaque équipe (V victoire, N nul, D défaite, puis manches gagnées) ; touchez-le pour revoir la première manche. Les Ombres sont des équipes d’entraînement présentes chaque jour.</p></section>
     ${season.length?`<section class="panel"><h2>Saison · points cumulés</h2><div class="stand">${season.map((x,i)=>`<div class="srow${x.id===PV.uid?' mine':''}"><span class="meta">${i+1}</span><div class="mi"><b>${esc(x.id===PV.uid?'Vous':(x.p||PV.names[x.id]||'Joueur'))}</b></div><span class="spts">${x.sp} pts</span></div>`).join('')}</div></section>`:''}`;
@@ -3065,6 +3121,7 @@ document.addEventListener('click',e=>{
     case 'daily':claimDaily();break;
     case 'fav':cycleFav();break;
     case 'slot':clickSlot(n);break;
+    case 'setlead':setLead(n);break;
     case 'unslot':unslot(n);break;
     case 'pick':pickHero(n);break;
     case 'speed':speed=speed===1?3:1;b.textContent=`Vitesse ×${speed===1?3:1}`;break;
@@ -3073,6 +3130,7 @@ document.addEventListener('click',e=>{
     case 'btgt':bTarget(+id);break;
     case 'bgo':{const w=bWait();if(w)bAct({i:w.sel});break}
     case 'bauto':bAuto();break;
+    case 'dupfuse':dupFuse(+id);break;
     case 'skup':{const [a,b]=String(id).split(':');skillUp(+a,+b);break}
     case 'bmode':S.settings=S.settings||{};S.settings.manual=!S.settings.manual;save();render();toast(S.settings.manual?'Mode manuel : vous choisissez les compétences et les cibles.':'Mode auto : vos héros combattent seuls.');break;
     case 'pull1':summon(1);break;
