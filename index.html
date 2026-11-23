@@ -647,6 +647,8 @@ img.art.foe{object-position:50% 50%}
 .panel.hardp{border-color:rgba(255,90,70,.6);box-shadow:0 0 0 1px rgba(255,90,70,.3),0 0 26px rgba(255,60,50,.18);background:linear-gradient(180deg,rgba(60,8,14,.55),rgba(6,14,32,.75))}
 .panel.hardp .floorno{color:#ffb0a0}
 .btn.hardbtn{background:linear-gradient(180deg,#ff5a4a,#9b1420);border-color:#ffb0a0;color:#fff}
+.refill{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin-top:10px}
+.refill .btn svg{width:18px;height:18px;vertical-align:-4px}
 </style>
 
 <div class="app">
@@ -2415,6 +2417,19 @@ const MISSIONS=[
 ];
 const DM_RW={gems:40,gold:400,energy:10},DM_CHEST={gems:150,gold:1000,shards:15,tomes:2,energy:40};
 const giveEnergy=n=>{S.energy=Math.min(ENERGY_MAX*2,(S.energy||0)+n)};
+/* Recharge d'énergie contre des cristaux : +60, 5 fois par jour, prix croissant */
+const REFILL_N=5,REFILL_E=60;let refillAsk=false;
+const refillUsed=()=>S.refill&&S.refill.d===dayIdx()?S.refill.n:0;
+const refillCost=()=>refillUsed()>=REFILL_N?null:50+25*refillUsed();
+function refillEnergy(){
+  tickEnergy();const c=refillCost();
+  if(c==null)return toast(`Déjà ${REFILL_N} recharges aujourd’hui. Revenez demain !`);
+  if(S.gems<c)return toast('Pas assez de cristaux.');
+  if(S.energy+REFILL_E>ENERGY_MAX*2)return toast('Votre énergie est déjà presque au double du maximum.');
+  if(!refillAsk){refillAsk=true;render();setTimeout(()=>{if(refillAsk){refillAsk=false;render()}},4000);return}
+  refillAsk=false;S.gems-=c;giveEnergy(REFILL_E);S.refill={d:dayIdx(),n:refillUsed()+1};sfx('heal');save();render();
+  toast(`+${REFILL_E} énergie pour ${c} cristaux (${refillUsed()}/${REFILL_N} aujourd’hui).`);
+}
 function dailyMissions(){
   const d=dayIdx();
   if(!S.dm||S.dm.day!==d){
@@ -2940,7 +2955,7 @@ function renderHud(){
     <div class="wallet">
       <div class="pill" title="Or">${COIN}<span>${S.gold.toLocaleString('fr-FR')}</span></div>
       <div class="pill" title="Cristaux">${GEM}<span>${S.gems.toLocaleString('fr-FR')}</span><button class="plus" data-act="tab" data-id="summon" aria-label="Aller à l’invocation">+</button></div>
-      <div class="pill en" title="Énergie des donjons">${ENERGYI}<span>${S.energy}/${ENERGY_MAX}</span></div>
+      <div class="pill en" title="Énergie des donjons">${ENERGYI}<span>${S.energy}/${ENERGY_MAX}</span><button class="plus" data-act="goref" aria-label="Recharger l’énergie">+</button></div>
     </div>`;
 }
 function renderDock(){
@@ -3294,6 +3309,7 @@ function renderDungeon(){
       <div class="row"><button class="btn" data-act="bmode" aria-pressed="${isManual()}">${isManual()?'Combat : manuel':'Combat : auto'}</button><button class="btn prime" data-act="drun" data-id="${d.k}" ${busy||S.energy<energyCost()||!party.some(h=>h.hp>0)?'disabled':''}>Entrer · ${energyCost()} énergie</button><span class="meta">${d.type==='gear'?`${d.k===fk?'2 à 6':'1 à 3'} pièces · ${dunGold(L)} or`:d.type==='gold'?'Pas d’équipement, beaucoup d’or':`+ ${dunGold(L)} or`}</span></div>
     </section>`}).join('');
   return`<section class="panel"><div class="hp"><div class="lab"><span>Énergie</span><span id="energy">${S.energy}/${ENERGY_MAX}</span></div><div class="bar ebar"><i style="width:${Math.min(100,S.energy/ENERGY_MAX*100)}%"></i></div></div>
+    <div class="refill" id="refill">${refillCost()==null?`<span class="meta">Recharges épuisées pour aujourd’hui (${REFILL_N}/${REFILL_N}).</span>`:`<button class="btn ${refillAsk?'warn':'prime'}" data-act="refill" ${S.gems<refillCost()||busy?'disabled':''}>${refillAsk?`Confirmer : ${refillCost()} cristaux`:`${ENERGYI} +${REFILL_E} énergie · ${refillCost()} ${GEM}`}</button><span class="meta">${refillUsed()}/${REFILL_N} recharges aujourd’hui · le prix augmente de 25 à chaque recharge</span>`}</div>
     <p class="note">+3 énergie toutes les 2 minutes (plein en 1 h 20), +50 avec le bonus du jour, +10 par mission du jour et +40 avec leur coffre (l’énergie peut alors dépasser le maximum). Les donjons utilisent la formation de la Tour, et les héros peuvent y mourir aussi. Le rang SS n’apparaît qu’à partir du niveau 7.</p></section>
     ${lastBattle&&lastBattle.mode==='dungeon'?renderBattle():''}${cards}`;
 }
@@ -3672,6 +3688,8 @@ document.addEventListener('click',e=>{
     case 'tunlock':unlockTrain();break;
     case 'climb':climb();break;
     case 'climbh':climbHard();break;
+    case 'refill':refillEnergy();break;
+    case 'goref':tab='dungeon';render();requestAnimationFrame(()=>{const el=document.getElementById('refill');if(el)el.scrollIntoView({behavior:'smooth',block:'center'})});break;
     case 'tmode':tmode=id;window.scrollTo(0,0);render();break;
     case 'rest':rest();break;
     case 'daily':claimDaily();break;
