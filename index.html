@@ -5,12 +5,9 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="description" content="Appel de la Tour : un jeu gacha où l’on invoque des héros pour gravir une tour de 250 étages.">
 <style>:root{color-scheme:dark;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
-<script src="https://cdn.jsdelivr.net/npm/firebase@10.12.2/firebase-app-compat.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/firebase@10.12.2/firebase-auth-compat.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/firebase@10.12.2/firebase-firestore-compat.js"></script>
 <script>
 /* Firebase : remplace les services de claude.ai (base partagée, identité) quand le jeu tourne hors de claude.ai */
-window.FIREBASE_CONFIG = {"apiKey": "AIzaSyDY0B7n1CO-riUf_W5z5xoA59HlcIDNKoE", "authDomain": "appel-de-la-tour.firebaseapp.com", "projectId": "appel-de-la-tour", "storageBucket": "appel-de-la-tour.firebasestorage.app", "messagingSenderId": "433520800662", "appId": "1:433520800662:web:bd8d57aa19ff5b167c63b7"};
+window.FIREBASE_CONFIG = null;
 (function(){
   if(window.claude||!window.FIREBASE_CONFIG)return;
   let ready=null;
@@ -602,6 +599,10 @@ img.art.foe{object-position:50% 50%}
 .rkv{font-weight:700;white-space:nowrap;color:#bff0ff}
 .tier{display:inline-block;margin-right:8px;padding:2px 9px;border-radius:999px;font-weight:800;font-size:12px;color:#06101f;background:var(--tc);box-shadow:0 0 10px color-mix(in srgb,var(--tc) 60%,transparent)}
 .league{display:grid;gap:4px;margin-top:8px;padding:10px;border:1px solid rgba(127,220,255,.35);border-radius:8px;background:rgba(6,14,32,.6)}
+.pill.en span{font-size:.92em}
+.permadeath{display:flex;gap:8px;align-items:flex-start;margin:10px 0 0;padding:8px 10px;border-radius:8px;border:1px solid rgba(255,122,106,.45);background:rgba(120,20,20,.25);color:#ffc9c0;font-size:12.5px;line-height:1.35}
+.permadeath svg{width:18px;height:18px;flex:none;color:#ff8a7a}
+#formation{scroll-margin-top:110px}
 </style>
 
 <div class="app">
@@ -2196,7 +2197,7 @@ function questAlert(){
 }
 function showIntro(i=0){
   const pages=[
-    ['Bienvenue, Invocateur','La Tour d’Appel s’est réveillée. Ses 250 étages grouillent de monstres, et seuls les héros que vous invoquez peuvent la gravir. Chacun d’eux n’a qu’une vie : un héros qui tombe ne revient jamais.'],
+    ['Bienvenue, Invocateur','La Tour d’Appel s’est réveillée. Ses 250 étages grouillent de monstres, et seuls les héros que vous invoquez peuvent la gravir. Attention : <b>la mort est définitive</b>. Un héros dont les PV tombent à 0 quitte votre équipe et rejoint le Mémorial. Soignez-les à l’Auberge entre deux étages ; l’Oracle permet exceptionnellement de ressusciter un héros tombé 5 heures plus tard, depuis le Mémorial.'],
     ['Votre première équipe','Invoquez des héros au portail, placez-les dans la formation (les Gardiens et Guerriers devant, les Archers, Mages et Soigneurs derrière), puis lancez le combat. Les éléments et les synergies de classe font la différence.'],
     ['Devenir plus fort','Équipez vos héros grâce aux donjons, améliorez leurs pièces, faites-les monter d’étoiles avec les éclats, et suivez le Guide et les Missions du jour : ils vous montrent toujours quoi faire ensuite.']
   ];
@@ -2650,6 +2651,7 @@ function heroCard(h,mode,note,delay){
   </article>`;
 }
 
+const ENERGYI='<svg class="cur" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7z" fill="#ffd35a" stroke="#7a4a00" stroke-width="1.2" stroke-linejoin="round"/></svg>';
 function renderHud(){
   const f=favHero();
   document.getElementById('hud').innerHTML=`
@@ -2658,6 +2660,7 @@ function renderHud(){
     <div class="wallet">
       <div class="pill" title="Or">${COIN}<span>${S.gold.toLocaleString('fr-FR')}</span></div>
       <div class="pill" title="Cristaux">${GEM}<span>${S.gems.toLocaleString('fr-FR')}</span><button class="plus" data-act="tab" data-id="summon" aria-label="Aller à l’invocation">+</button></div>
+      <div class="pill en" title="Énergie des donjons">${ENERGYI}<span>${S.energy}/${ENERGY_MAX}</span></div>
     </div>`;
 }
 function renderDock(){
@@ -2697,7 +2700,7 @@ function renderHome(){
       ${guideRibbon()}
       <div class="quick">
         <button class="qb" data-act="tab" data-id="tower">${ui('scroll')}<div><b>Tour</b><small>Étage ${S.floor}${S.floor%10===0?' · Boss !':''}</small></div></button>
-        <button class="qb" data-act="tab" data-id="tower">${ui('team')}<div><b>Formation</b><small>${S.party.length}/5 héros</small></div></button>
+        <button class="qb" data-act="goform">${ui('team')}<div><b>Formation</b><small>${S.party.length}/5 héros</small></div></button>
         <button class="qb" data-act="tab" data-id="dungeon">${ui('dungeon')}<div><b>Donjons</b><small>${S.energy}/${ENERGY_MAX} énergie</small></div></button>
       </div>
       <button class="banner pvpb" data-act="tab" data-id="pvp"><div class="faces">${pvpHand(dayIdx(),myPvpKey()).slice(0,3).map(i=>pvpPool(dayIdx())[i]).map(u=>`<div class="ava">${portrait({name:u.name,cls:u.cls,stars:u.stars,seed:u.seed})}</div>`).join('')}</div><div><b>Draft de l’Oracle</b><small>PvP · ${pvpLaw(dayIdx()).n} · ${pvpLocal().sub?'équipe inscrite':'composez votre équipe'}</small></div></button>
@@ -2720,6 +2723,7 @@ function renderTower(){
 <button class="btn" data-act="bmode" aria-pressed="${isManual()}">${isManual()?'Combat : manuel':'Combat : auto'}</button>
         <button class="btn prime" data-act="climb" ${busy||!able||f>TOWER_MAX?'disabled':''}>${f>TOWER_MAX?'Tour terminée':'Combattre !'}</button>
       </div>
+      <p class="permadeath">${ui('memorial')}<span><b>Mort définitive</b> : un héros à 0 PV rejoint le Mémorial. Soignez l’équipe à l’Auberge avant les étages difficiles.</span></p>
     </div>
     <div class="foes">${S.foes.map((x,i)=>`<div class="foe${x.boss?' boss':''}">${elChip(x.el)} <b>${names[i]}</b> <span class="muted">PV ${x.hp} · ATQ ${x.atk}</span></div>`).join('')}</div>
     <p class="note">Efficace contre cet étage : ${counters.map(elChip).join(' ')}</p>
@@ -2747,7 +2751,7 @@ function slotHtml(i){
 function renderFormation(){
   const fsl=slotsOf(fkey),bench=sortedHeroes().filter(h=>!fsl.includes(h.id)&&!inTrain(h.id)&&(fkey==='main'||h.el===fkey));
   const selH=selHero!=null&&heroById(selHero);
-  return`<section class="panel"><h2>Formation${fkey==='main'?'':' '+ELEM[fkey].n} · ${fsl.filter(Boolean).length}/5</h2>
+  return`<section class="panel" id="formation"><h2>Formation${fkey==='main'?'':' '+ELEM[fkey].n} · ${fsl.filter(Boolean).length}/5</h2>
     <p class="hint">${selH?`<b>${selH.name}</b> est sélectionné : touchez un emplacement pour le placer ou l’échanger.`:'Touchez un héros, puis un emplacement, pour le placer. Deux héros de l’équipe s’échangent leur place. La couronne ♛ sur une case nomme le chef de l’équipe.'}</p>
     <div class="rowlab"><b>Ligne avant</b><span>Reçoit 85 % des attaques ciblées</span></div>
     <div class="frow">${[0,1,2].map(slotHtml).join('')}</div>
@@ -2851,7 +2855,7 @@ function renderHeroes(){
   if(sheetId!=null&&heroById(sheetId))return renderSheet();
   const list=S.heroes.slice().sort((a,b)=>(S.party.includes(b.id)-S.party.includes(a.id))||b.stars-a.stars||b.lvl-a.lvl);
   const fusable=S.heroes.filter(canFuse).length;
-  return`${fuseTarget?renderFuse():''}<div class="row"><button class="btn" data-act="tab" data-id="train">${ui('train')}Zone d’entraînement · ${S.train.length}/${S.trainSlots}</button></div><section><h2>Guilde · ${S.heroes.length} héros · équipe ${S.party.length}/5${fusable?` · ${fusable} fusion${fusable>1?'s':''} possible${fusable>1?'s':''}`:''}</h2>
+  return`${fuseTarget?renderFuse():''}<div class="row"><button class="btn prime" data-act="goform">${ui('team')}Composer l’équipe</button><button class="btn" data-act="tab" data-id="train">${ui('train')}Zone d’entraînement · ${S.train.length}/${S.trainSlots}</button></div><section><h2>Guilde · ${S.heroes.length} héros · équipe ${S.party.length}/5${fusable?` · ${fusable} fusion${fusable>1?'s':''} possible${fusable>1?'s':''}`:''}</h2>
   ${list.length?`<div class="grid">${list.map(h=>heroCard(h,'full')).join('')}</div>`:'<p class="empty">Votre guilde est vide. Invoquez des héros au portail.</p>'}
   <p class="note">Fusion : deux héros de même classe et même rareté donnent un héros d’une étoile de plus, jusqu’à 4★. Les 5★ ne s’obtiennent que par invocation. Renvoyer un héros rapporte de l’or (${[1,2,3,4,5].map(s=>`${s}★ ${15*s*s}`).join(' · ')}).</p></section>`;
 }
@@ -3316,6 +3320,7 @@ document.addEventListener('click',e=>{
     case 'btgt':bTarget(+id);break;
     case 'bgo':{const w=bWait();if(w)bAct({i:w.sel});break}
     case 'bauto':bAuto();break;
+    case 'goform':fkey='main';tab='tower';sheetId=null;render();requestAnimationFrame(()=>{const el=document.getElementById('formation');if(el)el.scrollIntoView({behavior:'smooth',block:'start'})});break;
     case 'psub':psub=id;render();break;
     case 'royreg':royRegister(+id);break;
     case 'royclaim':royClaim();break;
