@@ -2153,7 +2153,7 @@ function ascend(id){
 function casualties(res,sum,where){
   res.U.filter(u=>u.side==='h').forEach(u=>{
     const h=heroById(u.id);h.hp=Math.min(stats(h).hp,Math.round(u.hp/(u.hpMul||1)));
-    if(!u.alive){sum.fallen.push(h.name);S.fallen.unshift({name:h.name,cls:h.cls,stars:h.stars,lvl:h.lvl,awk:h.awk,leg:h.leg||null,seed:h.seed,el:h.el,where,killer:u.killer})}
+    if(!u.alive){sum.fallen.push(h.name);S.fallen.unshift({name:h.name,cls:h.cls,stars:h.stars,lvl:h.lvl,awk:h.awk,leg:h.leg||null,seed:h.seed,el:h.el,where,killer:u.killer,at:Date.now(),hero:JSON.parse(JSON.stringify(h))})}
   });
   const dead=res.U.filter(u=>u.side==='h'&&!u.alive).map(u=>u.id);
   dead.forEach(id=>{unequipAll(id);removeFromTeam(id)});
@@ -2516,7 +2516,7 @@ function renderHome(){
     <div class="side r">
       <button class="rb" data-act="tab" data-id="guild"><span class="o">${S.guild?emblem(S.guild,26):ui('team')}</span>${gAlert()?'<span class="badge">!</span>':''}<span>Guilde</span></button>
       ${(()=>{const n=afkClears();return`<button class="rb" data-act="${n?'afk':'tab'}" data-id="tower"><span class="o">${ui('loot')}</span>${n?'<span class="badge">!</span>':''}<span>Farm auto${n?`<br>${n} victoire${n>1?'s':''}`:''}</span></button>`})()}
-      <button class="rb" data-act="tab" data-id="memorial"><span class="o">${ui('memorial')}</span><span>Mémorial</span></button>
+      <button class="rb" data-act="tab" data-id="memorial"><span class="o">${ui('memorial')}</span>${canRevive()?'<span class="badge">!</span>':''}<span>Mémorial</span></button>
       <button class="rb" data-act="fav" ${S.heroes.length<2?'disabled':''}><span class="o">${ui('swap')}</span><span>Changer<br>de héros</span></button>
     </div>
     ${f?`<div class="stage">${portrait(f,true)}</div>
@@ -3029,9 +3029,20 @@ function guideRibbon(){
   return`<button class="guider${ok?' ok':''}" data-act="${ok?'gclaim':'tab'}" data-id="${ok?'':g.go}"><span class="meta">Guide ${i+1}/${GUIDE.length}</span><b>${g.n}</b><span class="gract">${ok?`Réclamer · ${fmtR(g.rw)}`:'Y aller ›'}</span></button>`;
 }
 
+const REVIVE_MS=5*3600e3;
+const reviveLeft=x=>Math.max(0,(x.at||0)+REVIVE_MS-Date.now());
+const canRevive=()=>S.fallen.some(x=>x.cls&&CLASSES[x.cls]&&reviveLeft(x)<=0);
+function revive(i){
+  const x=S.fallen[i];if(!x||busy||reviveLeft(x)>0||!CLASSES[x.cls])return;
+  S.fallen.splice(i,1);
+  if(x.leg){const own=S.heroes.find(h=>h.leg===x.leg);if(own){if((own.awk||0)<AWK_MAX){withRatio(own,()=>{own.awk=(own.awk||0)+1})}else S.shards+=40;save();render();return toast(`${x.name} rejoint ${own.name} déjà présent : doublon absorbé.`)}}
+  const base=x.hero||{name:x.name,cls:x.cls,stars:x.stars,lvl:x.lvl,xp:0,awk:x.awk||0,leg:x.leg||undefined,el:x.el||randEl(),seed:x.seed,trait:pick(TRAITS).k};
+  const h={...base,id:S.next++};delete h.hpMul;if(!h.leg)delete h.leg;h.hp=stats(h).hp;
+  S.heroes.push(h);sfx('heal');save();render();toast(`${h.name} revient à la vie ! Il attend dans la guilde (sans équipement).`);
+}
 function renderMemorial(){
-  return`<section class="panel"><h2>Mémorial des tombés</h2>
-  ${S.fallen.length?`<div class="fallen">${S.fallen.map(x=>`<div><div class="ava">${portrait(x)}</div><div class="info"><span><b>${x.name}</b> <span class="r${x.stars}"><span class="stars">${'★'.repeat(x.stars)}</span></span> · ${CLASSES[x.cls].n} niv. ${x.lvl}${x.awk?` · éveil ${x.awk}`:''}</span><span class="muted">${x.where||'Étage '+x.floor}, vaincu par ${x.killer||'l’inconnu'}</span></div></div>`).join('')}</div>`:'<p class="empty">Aucun héros n’est encore tombé. Que cela dure.</p>'}
+  return`<section class="panel"><h2>Mémorial des tombés</h2><p class="note" style="margin-top:0">Exceptionnellement, l’Oracle accorde une seconde chance : 5 heures après sa chute, un héros peut revenir gratuitement, avec son niveau, ses étoiles, ses doublons et ses compétences. Son équipement est resté dans le sac.</p>
+  ${S.fallen.length?`<div class="fallen">${S.fallen.map(x=>`<div><div class="ava">${portrait(x)}</div><div class="info"><span><b>${x.name}</b> <span class="r${x.stars}"><span class="stars">${'★'.repeat(x.stars)}</span></span> · ${CLASSES[x.cls].n} niv. ${x.lvl}${x.awk?` · éveil ${x.awk}`:''}</span><span class="muted">${x.where||'Étage '+x.floor}, vaincu par ${x.killer||'l’inconnu'}</span>${CLASSES[x.cls]?(reviveLeft(x)<=0?`<button class="btn sm prime" data-act="revive" data-id="${S.fallen.indexOf(x)}" ${busy?'disabled':''}>Faire revivre · gratuit</button>`:`<span class="meta">Résurrection gratuite dans ${fmtLeft(reviveLeft(x))}</span>`):''}</div></div>`).join('')}</div>`:'<p class="empty">Aucun héros n’est encore tombé. Que cela dure.</p>'}
   </section>
   <section class="row"><button class="btn ${pendingReset?'warn':''}" data-act="reset">${pendingReset?'Confirmer : tout effacer ?':'Recommencer une partie'}</button><span class="muted" style="font-size:13px">${S.pulls} appels effectués au total.</span></section>`;
 }
@@ -3130,6 +3141,7 @@ document.addEventListener('click',e=>{
     case 'btgt':bTarget(+id);break;
     case 'bgo':{const w=bWait();if(w)bAct({i:w.sel});break}
     case 'bauto':bAuto();break;
+    case 'revive':revive(+id);break;
     case 'dupfuse':dupFuse(+id);break;
     case 'skup':{const [a,b]=String(id).split(':');skillUp(+a,+b);break}
     case 'bmode':S.settings=S.settings||{};S.settings.manual=!S.settings.manual;save();render();toast(S.settings.manual?'Mode manuel : vous choisissez les compétences et les cibles.':'Mode auto : vos héros combattent seuls.');break;
