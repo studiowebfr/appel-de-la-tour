@@ -5,9 +5,12 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="description" content="Appel de la Tour : un jeu gacha où l’on invoque des héros pour gravir une tour de 250 étages.">
 <style>:root{color-scheme:dark;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+<script src="https://cdn.jsdelivr.net/npm/firebase@10.12.2/firebase-app-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/firebase@10.12.2/firebase-auth-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/firebase@10.12.2/firebase-firestore-compat.js"></script>
 <script>
 /* Firebase : remplace les services de claude.ai (base partagée, identité) quand le jeu tourne hors de claude.ai */
-window.FIREBASE_CONFIG = null;
+window.FIREBASE_CONFIG = {"apiKey": "AIzaSyDY0B7n1CO-riUf_W5z5xoA59HlcIDNKoE", "authDomain": "appel-de-la-tour.firebaseapp.com", "projectId": "appel-de-la-tour", "storageBucket": "appel-de-la-tour.firebasestorage.app", "messagingSenderId": "433520800662", "appId": "1:433520800662:web:bd8d57aa19ff5b167c63b7"};
 (function(){
   if(window.claude||!window.FIREBASE_CONFIG)return;
   let ready=null;
