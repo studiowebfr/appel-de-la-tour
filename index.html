@@ -597,6 +597,9 @@ img.art.foe{object-position:50% 50%}
 .dups i.on{color:#ffe27a;text-shadow:0 0 6px rgba(255,226,122,.9),0 0 12px rgba(255,180,80,.6);animation:twinkle 1.6s ease-in-out var(--d) infinite}
 @keyframes twinkle{0%,100%{opacity:1;transform:scale(1)}45%{opacity:.55;transform:scale(.8)}55%{opacity:1;transform:scale(1.25)}}
 @media (prefers-reduced-motion:reduce){.dups i.on{animation:none}}
+.rkn{min-width:26px;text-align:center;font-weight:800;color:#8fa8c8}
+.rkn.top1{color:#ffd35a;text-shadow:0 0 8px rgba(255,211,90,.6)}.rkn.top2{color:#d9e3f0}.rkn.top3{color:#e0a36a}
+.rkv{font-weight:700;white-space:nowrap;color:#bff0ff}
 </style>
 
 <div class="app">
@@ -1709,14 +1712,14 @@ async function initPvp(){
   PV.unsub=PV.db.collection('drafts').onSnapshot(snap=>{
     if(!snap.metadata.fromCache)clearTimeout(timer);
     PV.status='online';PV.docs=snap.docs.map(x=>({id:x.id,...x.data()}));
-    pvpNames();if(tab==='pvp'&&!busy)render();
+    pvpNames();lbSync();if((tab==='pvp'||tab==='rank')&&!busy)render();
   },()=>{clearTimeout(timer);PV.status='offline';if(tab==='pvp'&&!busy)render()});
 }
 async function pvpNames(){
   if(!PV.user)return;const ids=PV.docs.map(x=>x.id).filter(id=>id!==PV.uid);if(!ids.length)return;
   const ps=await PV.user.profiles(ids);let ch=false;
   for(const id of ids){const n=(ps[id]&&ps[id].name)||'';if(PV.names[id]!==n){PV.names[id]=n;ch=true}}
-  if(ch&&tab==='pvp'&&!busy)render();
+  if(ch&&(tab==='pvp'||tab==='rank')&&!busy)render();
 }
 function pvpToggle(i){
   const L=pvpLocal(),w=L.work,d=L.day;
@@ -1745,7 +1748,7 @@ async function pvpSubmit(){
     if(PV.writing)return;PV.writing=true;
     const mine=PV.docs.find(x=>x.id===PV.uid)||{};
     const keep=mine.day===d?{prevDay:mine.prevDay??null,prev:mine.prev??null}:{prevDay:mine.day??null,prev:mine.draft??null};
-    try{await PV.db.collection('drafts').doc(PV.uid).set({day:d,draft:dr,...keep,sp:mine.sp||0,claimed:mine.claimed??null,p:(S.settings&&S.settings.name)||null})}
+    try{await PV.db.collection('drafts').doc(PV.uid).set({day:d,draft:dr,...keep,sp:mine.sp||0,claimed:mine.claimed??null,p:(S.settings&&S.settings.name)||null,lb:lbData()})}
     catch(e){PV.writing=false;return toast(e&&e.code==='invalid_argument'?'Ce partage ne permet pas d’inscrire une équipe.':'Envoi impossible pour le moment. Réessayez.')}
     PV.writing=false;
   }
@@ -1764,6 +1767,50 @@ function pvpWatch(id){
   const res=withSeed(hash(key),()=>simulate(ta.list,tb.list,ta.slots,25,{foeHeroes:true,foeSlots:tb.slots,mut:pvpLaw(d).k}));
   const sum={label:`Draft · vous contre ${entryName(B)} (manche 1)`,win:res.win,fallen:[],levels:[],gems:0,gold:0,loot:[],head:res.win?`Manche gagnée contre ${entryName(B)}`:`Manche perdue contre ${entryName(B)}`};
   lastBattle={res,sum,idx:0,done:false,mode:'pvp'};busy=true;render();window.scrollTo({top:0});play();
+}
+
+
+/* ---------- Classements (PvE, PvP, guildes) ---------- */
+let rsub='pve',lbLast='',lbAt=0;
+const etTotal=()=>Object.values(S.et||{}).reduce((t,x)=>t+((x&&x.best)||0),0);
+const lbData=()=>({best:S.best||0,et:etTotal(),pw:Math.round(power()),g:S.guild?S.guild.name.slice(0,24):null,t:Date.now()});
+async function lbSync(force){
+  if(PV.status!=='online'||!PV.canWrite||!PV.uid||PV.writing)return;
+  const d=lbData(),k=JSON.stringify({...d,t:0}),now=Date.now();
+  if(!force&&k===lbLast)return;if(!force&&now-lbAt<20000)return;
+  lbLast=k;lbAt=now;const mine=PV.docs.find(x=>x.id===PV.uid),nm=(S.settings&&S.settings.name)||null;
+  try{if(mine)await PV.db.collection('drafts').doc(PV.uid).update({lb:d,p:nm});else await PV.db.collection('drafts').doc(PV.uid).set({lb:d,p:nm,sp:0,day:null,draft:null})}catch(e){lbLast=''}
+}
+setInterval(()=>lbSync(),60000);
+const lbName=x=>x.me?'Vous':(x.p||PV.names[x.id]||'Joueur');
+function rankRows(list,fmt){
+  if(!list.length)return'<p class="empty">Personne n’est encore classé ici.</p>';
+  return`<div class="stand">${list.map((x,i)=>`<div class="srow${x.me?' mine':''}"><span class="rkn${i<3?' top'+(i+1):''}">${i+1}</span><div class="mi"><b>${esc(x.label)}</b>${x.sub?`<div class="meta">${x.sub}</div>`:''}</div><span class="rkv">${fmt(x)}</span></div>`).join('')}</div>`;
+}
+function renderRank(){
+  if(PV.status==='init')initPvp();
+  const online=PV.status==='online',d=dayIdx();
+  const tabs=`<div class="chips">${[['pve','Tour (PvE)'],['pvp','PvP'],['guild','Guildes']].map(([k,l])=>`<button class="chipbtn" data-act="rsub" data-id="${k}" aria-pressed="${rsub===k}">${l}</button>`).join('')}</div>`;
+  const st=online?'':PV.status==='offline'?'<p class="bad" style="margin:0 0 8px">Hors ligne : seuls vos propres résultats sont affichés.</p>':'<p class="meta" style="margin:0 0 8px">Connexion au classement…</p>';
+  let body='';
+  if(rsub==='pve'){
+    const me={me:true,id:PV.uid||'me',lb:lbData()};
+    const rows=(online?PV.docs.filter(x=>x.lb&&x.id!==PV.uid).map(x=>({...x})):[]).concat([me]);
+    const list=rows.map(x=>({me:x.me,label:lbName(x),sub:`Tours élémentaires : ${x.lb.et||0} étages · Puissance ${fmtN(x.lb.pw||0)}${x.lb.g?` · ${esc(x.lb.g)}`:''}`,v:x.lb.best||0,e:x.lb.et||0})).sort((a,b)=>b.v-a.v||b.e-a.e).slice(0,50);
+    body=`<section class="panel"><h2>Tour principale</h2>${st}${rankRows(list,x=>`Étage ${x.v}`)}<p class="note">Classement par record d’étage, puis par étages franchis dans les tours élémentaires. Mis à jour toutes les minutes.</p></section>`;
+  }
+  if(rsub==='pvp'){
+    const season=(online?PV.docs.filter(x=>x.sp):[]).map(x=>({me:x.id===PV.uid,label:lbName({...x,me:x.id===PV.uid}),v:x.sp})).sort((a,b)=>b.v-a.v).slice(0,50);
+    const y=pvpStandings(d-1).slice(0,3),t=pvpStandings(d).slice(0,10);
+    body=`<section class="panel"><h2>Saison du Draft</h2>${st}${rankRows(season,x=>`${x.v} pts`)}<p class="note">Points de saison gagnés chaque jour selon la place au Draft de l’Oracle.</p></section>
+      <section class="panel"><h2>Podium d’hier</h2>${rankRows(y.map(e=>({me:e.me,label:entryName(e)+(e.bot?' (Ombre)':''),v:e.pts})),x=>`${x.v} pts`)}</section>
+      <section class="panel"><h2>Aujourd’hui, en direct</h2>${rankRows(t.map(e=>({me:e.me,label:entryName(e)+(e.bot?' (Ombre)':''),sub:`${e.w} V · ${e.dr} N · ${e.l} D`,v:e.pts})),x=>`${x.v} pts`)}<button class="btn sm" data-act="tab" data-id="pvp" style="margin-top:8px">Aller au Draft</button></section>`;
+  }
+  if(rsub==='guild'){
+    const gl=GO.status==='online'?GO.guilds.map(x=>({me:S.guild&&S.guild.gid===x.id,label:x.n||'Guilde',sub:`Chef : ${esc(x.p||'Joueur')} · ${Math.max(1,goCount(x.id))}/${GMAX} joueurs`,lvl:x.lvl||1,tr:x.tr||0,c:goCount(x.id)})).sort((a,b)=>b.lvl-a.lvl||b.tr-a.tr||b.c-a.c).slice(0,50):[];
+    body=`<section class="panel"><h2>Guildes</h2>${GO.status==='online'?'':'<p class="meta" style="margin:0 0 8px">Connexion aux guildes…</p>'}${rankRows(gl,x=>`Niv. ${x.lvl}${x.tr?` · ${x.tr} 🏆`:''}`)}<p class="note">Classement par niveau de guilde, puis par trophées de guerre et nombre de joueurs.</p></section>`;
+  }
+  return tabs+body;
 }
 
 /* ---------- Chat global ---------- */
@@ -2251,10 +2298,12 @@ function lootWeights(L){const w6=L>=7?(L-6)*.6:0,w5=1+.8*L,w4=4+1.6*L,w3=14+2*L,
 function rollRar(L){const w=lootWeights(L);let r=R()*100;for(let i=5;i>=0;i--){if(r<w[i])return i+1;r-=w[i]}return 1}
 const dunGold=L=>60+L*35;
 const foesPower=f=>Math.round(f.reduce((t,x)=>t+x.hp*.5+x.atk*4+x.def*3,0));
+/* Difficulté des donjons : équivalent d'étage de la Tour (le coffre-fort d'or reste plus doux) */
+const dunEq=(k,L)=>k==='tresor'?L*10-5:L*18-8;
 function genDunFoes(k,L){
-  const d=DUNGEONS.find(x=>x.k===k),fe=[randEl(),randEl()],sc=scHard(scMain(L*10-5));
-  const foes=d.foes.map(n=>{const t=FOES.find(x=>x.n===n);return{n:t.n,hp:Math.round(t.hp*sc),atk:Math.round(t.atk*sc),def:Math.round(t.def*sc),spd:t.spd,el:pick(fe),lv:L*10-5}});
-  foes.push({n:d.boss,hp:Math.round(200*sc),atk:Math.round(13*sc),def:Math.round(5*sc),spd:9,boss:true,el:fe[0],lv:L*10-5});
+  const d=DUNGEONS.find(x=>x.k===k),fe=[randEl(),randEl()],eq=dunEq(k,L),sc=scHard(scMain(eq));
+  const foes=d.foes.map(n=>{const t=FOES.find(x=>x.n===n);return{n:t.n,hp:Math.round(t.hp*sc),atk:Math.round(t.atk*sc),def:Math.round(t.def*sc),spd:t.spd,el:pick(fe),lv:eq}});
+  foes.push({n:d.boss,hp:Math.round(200*sc),atk:Math.round(13*sc),def:Math.round(5*sc),spd:9,boss:true,el:fe[0],lv:eq});
   return foes;
 }
 function dunFoes(k){const L=S.dunSel[k];if(!S.dunFoes[k]||S.dunFoes[k].lvl!==L)S.dunFoes[k]={lvl:L,foes:genDunFoes(k,L)};return S.dunFoes[k].foes}
@@ -2371,6 +2420,12 @@ function clickSlot(i){
   selHero=null;syncParty();save();render();
 }
 function unslot(i){if(busy)return;const sl=slotsOf(fkey),id=sl[i];if(!id)return;sl[i]=null;if(selHero===id)selHero=null;syncParty();save();render()}
+function train(id){
+  const h=heroById(id);if(!h||busy)return;
+  if(h.lvl>=capOf(h))return toast(`${h.name} a atteint son niveau maximal (${capOf(h)}). Faites-le monter en étoiles pour aller plus haut.`);
+  const c=trainCost(h);if(S.gold<c)return toast(`Pas assez d’or : il faut ${c} or.`);
+  S.gold-=c;h.xp=0;levelUp(h);sfx('coin');save();render();toast(`${h.name} passe au niveau ${h.lvl}.`);
+}
 const materialsFor=h=>S.heroes.filter(x=>x.id!==h.id&&!x.leg&&x.cls===h.cls&&x.stars===h.stars);
 const canFuse=h=>!h.leg&&h.stars<4&&materialsFor(h).length>0;
 function startFuse(id){if(busy)return;fuseTarget=fuseTarget===id?null:id;render();if(fuseTarget)window.scrollTo({top:0,behavior:'smooth'})}
@@ -2404,7 +2459,8 @@ const UI={
   home:'<path d="M3 11.5L12 4l9 7.5V20h-6v-5.5H9V20H3z"/>',
   tower:'<path d="M7 21V9L5 7V3h3v2h2V3h4v2h2V3h3v4l-2 2v12zM10 21v-3.5a2 2 0 0 1 4 0V21M11 10h2"/>',
   heroes:'<path d="M5 14a7 7 0 0 1 14 0v4h-4.5v-3.5h-5V18H5zM12 7V3.5M9 4.5l3-1.5 3 1.5"/>',
-  memorial:'<path d="M6 21V10a6 6 0 0 1 12 0v11zM12 9v6M9.5 11.5h5M3.5 21h17"/>',
+  rank:'<path d="M8 21V11h8v10M3 21v-6h5M16 21v-8h5M3 21h18M12 3l1.2 2.5 2.8.4-2 1.9.5 2.7L12 9.2l-2.5 1.3.5-2.7-2-1.9 2.8-.4z"/>',
+memorial:'<path d="M6 21V10a6 6 0 0 1 12 0v11zM12 9v6M9.5 11.5h5M3.5 21h17"/>',
   summon:'<circle cx="12" cy="10" r="6"/><path d="M8 21h8l-1.5-4.5h-5zM9.5 9.5l2.5-2.5 2.5 2.5"/>',
   chest:'<path d="M4 10.5h16V19H4zM4 10.5A4 4 0 0 1 8 6.5h8a4 4 0 0 1 4 4M4 13.5h16M11 12.5h2v3h-2z"/>',
   inn:'<path d="M3 19V7M3 15h18v4M21 19v-4a3 3 0 0 0-3-3h-7v3M7 12.5a1.8 1.8 0 1 0 0-.1"/>',
@@ -2516,6 +2572,7 @@ function renderHome(){
     <div class="side r">
       <button class="rb" data-act="tab" data-id="guild"><span class="o">${S.guild?emblem(S.guild,26):ui('team')}</span>${gAlert()?'<span class="badge">!</span>':''}<span>Guilde</span></button>
       ${(()=>{const n=afkClears();return`<button class="rb" data-act="${n?'afk':'tab'}" data-id="tower"><span class="o">${ui('loot')}</span>${n?'<span class="badge">!</span>':''}<span>Farm auto${n?`<br>${n} victoire${n>1?'s':''}`:''}</span></button>`})()}
+      <button class="rb" data-act="tab" data-id="rank"><span class="o">${ui('rank')}</span><span>Classement</span></button>
       <button class="rb" data-act="tab" data-id="memorial"><span class="o">${ui('memorial')}</span>${canRevive()?'<span class="badge">!</span>':''}<span>Mémorial</span></button>
       <button class="rb" data-act="fav" ${S.heroes.length<2?'disabled':''}><span class="o">${ui('swap')}</span><span>Changer<br>de héros</span></button>
     </div>
@@ -3054,7 +3111,7 @@ function render(){
   renderHud();renderDock();
   const m=document.getElementById('main');
   m.className=tab==='home'?'home':'pad gut';
-  m.innerHTML=tab==='home'?renderHome():tab==='tower'?renderTower():tab==='dungeon'?renderDungeon():tab==='bag'?renderBag():tab==='quests'?renderQuests():tab==='pvp'?renderPvp():tab==='guild'?renderGuild():tab==='events'?renderEvents():tab==='etower'?renderETower():tab==='train'?renderTrain():tab==='summon'?renderSummon():tab==='heroes'?renderHeroes():renderMemorial();
+  m.innerHTML=tab==='home'?renderHome():tab==='tower'?renderTower():tab==='dungeon'?renderDungeon():tab==='bag'?renderBag():tab==='quests'?renderQuests():tab==='pvp'?renderPvp():tab==='guild'?renderGuild():tab==='events'?renderEvents():tab==='etower'?renderETower():tab==='train'?renderTrain():tab==='summon'?renderSummon():tab==='heroes'?renderHeroes():tab==='rank'?renderRank():renderMemorial();
   const l=document.getElementById('blog');if(l)l.scrollTop=l.scrollHeight;
 }
 
@@ -3141,6 +3198,7 @@ document.addEventListener('click',e=>{
     case 'btgt':bTarget(+id);break;
     case 'bgo':{const w=bWait();if(w)bAct({i:w.sel});break}
     case 'bauto':bAuto();break;
+    case 'rsub':rsub=id;render();break;
     case 'revive':revive(+id);break;
     case 'dupfuse':dupFuse(+id);break;
     case 'skup':{const [a,b]=String(id).split(':');skillUp(+a,+b);break}
@@ -3166,7 +3224,7 @@ document.getElementById('chatfab').addEventListener('click',()=>chatToggle());
 document.getElementById('chatclose').addEventListener('click',()=>chatToggle(false));
 document.getElementById('chatform').addEventListener('submit',e=>{e.preventDefault();chatSend()});
 document.addEventListener('keydown',e=>{if(e.key!=='Escape')return;if(!document.getElementById('modal').hidden&&!modalLocked){closeModal();return}if(CH.open)chatToggle(false)});
-if(!window.claude){document.getElementById('chatfab').hidden=true;GO.status='offline'}else{initChat();initGuildOnline()}
+if(!window.claude){document.getElementById('chatfab').hidden=true;GO.status='offline'}else{initChat();initGuildOnline();initPvp()}
 document.addEventListener('input',e=>{if(e.target.id==='gname')gNameDraft=e.target.value});
 document.addEventListener('change',e=>{if(e.target.id==='rsel')royaleSel=Number(e.target.value)});
 setInterval(()=>{if(!busy&&((tab==='train'&&S.train.length)||tab==='tower'||tab==='events'||tab==='guild')){render();save()}},30000);
