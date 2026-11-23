@@ -624,6 +624,21 @@ img.art.foe{object-position:50% 50%}
 .resc p{margin:6px 0 0;font-size:13px;line-height:1.4;color:#cfe2f5}.resc p b{color:#8fd8ff}
 .reshd{display:flex;align-items:center;gap:10px}.resic{display:grid;place-items:center;width:40px;height:40px;flex:none;border-radius:10px;background:rgba(0,0,0,.35);border:1px solid rgba(127,220,255,.3)}
 .resic svg{width:26px;height:26px}.resui{color:#ffd35a;display:grid}.resn{font-weight:800;color:#bff0ff}.resv{font-size:20px;font-weight:800;color:#fff}
+.rtabar{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;justify-content:space-between}
+.rtawait{font-weight:800;color:#ffd35a;margin-right:auto}
+.rtaq{text-align:center}.rtaq .spin{width:46px;height:46px;margin:6px auto 10px;border-radius:50%;border:4px solid rgba(127,220,255,.25);border-top-color:#7fdcff;animation:rspin 1s linear infinite}
+@keyframes rspin{to{transform:rotate(360deg)}}@media (prefers-reduced-motion:reduce){.rtaq .spin{animation:none}}
+.rtastat{font-weight:800;margin:0 0 10px}
+.rtateam{margin:8px 0}.rtalab{font-weight:800;font-size:13px;color:#8fa8c8;margin-bottom:4px}.rtateam.mine .rtalab{color:#7fdcff}
+.rtaslots{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}
+.rtaslot{display:grid;justify-items:center;gap:2px;padding:4px;border-radius:8px;border:1px solid rgba(127,220,255,.35);background:rgba(6,14,32,.6);min-width:0;font-size:11px;font-weight:700;text-align:center}
+.rtaslot span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rtaslot svg,.rtaslot img.art{width:100%;max-width:56px;aspect-ratio:1;border-radius:6px}
+.rtaslot.empty{min-height:72px;border-style:dashed;opacity:.5}
+.rtaslot.banned,.pcard.banned{position:relative;opacity:.45;filter:grayscale(1)}
+.rtaslot.banned::after,.pcard.banned::after{content:"BANNI";position:absolute;inset:auto 0 40% 0;text-align:center;font-weight:900;color:#ff6b6b;letter-spacing:.08em;text-shadow:0 0 6px #000}
+.btn.big{width:100%;min-height:52px;font-size:17px}
+.tearbox{display:flex;gap:10px;align-items:center;padding:10px;border-radius:10px;border:1px solid rgba(185,140,255,.5);background:rgba(40,16,70,.45);margin-bottom:8px}
 </style>
 
 <div class="app">
@@ -1076,8 +1091,8 @@ function battleNew(heroes,foes,slots,maxR,opt){
   slots=slots||S.slots;
   const rowIn=(sl,id)=>{const i=sl.indexOf(id);return i>=3?'back':'front'};
   const U=[],names=labelFoes(foes);
-  const mk=(h,side,sl)=>{const s=stats(h),row=rowIn(sl,h.id);return{side,id:h.id,name:h.name,cls:h.cls,leg:h.leg||null,seed:h.seed,stars:h.stars,hp:h.hp,max:s.hp,atk:s.atk,def:s.def,spd:s.spd,crit:s.crit,cdmg:s.cdmg,pen:s.pen,acc:s.acc||0,res:s.res==null?15:s.res,
-    alive:h.hp>0,turn:0,killer:null,el:h.el,row,rowMul:(row==='back'&&MELEE(h.cls))?.7:1,sk:skillsOf(h).map((x,i)=>h.pvpMerc?x:skillAt(x,skLv(h,i))),cd:[0,0,0],fx:[],atb:0,eff:setEffOf(h),lead:leadIdOf(sl)===h.id?leaderOf(h):null}};
+  const mk=(h,side,sl)=>{const s=h.rc||stats(h),row=rowIn(sl,h.id);return{side,id:h.id,name:h.name,cls:h.cls,leg:h.leg||null,seed:h.seed,stars:h.stars,hp:h.hp,max:s.hp,atk:s.atk,def:s.def,spd:s.spd,crit:s.crit,cdmg:s.cdmg,pen:s.pen,acc:s.acc||0,res:s.res==null?15:s.res,
+    alive:h.hp>0,turn:0,killer:null,el:h.el,row,rowMul:(row==='back'&&MELEE(h.cls))?.7:1,sk:skillsOf(h).map((x,i)=>h.pvpMerc?x:skillAt(x,skLv(h,i))),cd:[0,0,0],fx:[],atb:0,eff:h.rc?(h.eff||{}):setEffOf(h),lead:leadIdOf(sl)===h.id?leaderOf(h):null}};
   heroes.forEach(h=>U.push(mk(h,'h',slots)));
   if(opt.foeHeroes){foes.forEach(h=>{const u=mk(h,'f',opt.foeSlots);u.pvp=true;U.push(u)});applySyn(U.filter(u=>u.side==='f'),teamSyn(foes))}
   else foes.forEach((f,i)=>{const lv=f.lv||0;U.push({side:'f',name:names[i],cls:'foe',hp:f.hp,max:f.hp,atk:f.atk,def:f.def,spd:f.spd,alive:true,turn:0,boss:!!f.boss,el:f.el,crit:f.crit||5,cdmg:f.cdmg||150,pen:f.pen!=null?f.pen:(f.boss?10:0),
@@ -1199,11 +1214,12 @@ function battleNew(heroes,foes,slots,maxR,opt){
       const u=nextActor();u.turn++;B.acts++;
       if(u.cd)u.cd=u.cd.map(c=>Math.max(0,c-1));
       if(has(u,'stun')){log(`${u.name} est étourdi et passe son tour.`,'sys',{s:U.indexOf(u)});endTurn(u);if(check())return;continue}
-      if(u.side==='h'&&B.manual){B.wait=U.indexOf(u);log(`Au tour de ${u.name}.`,'turn',{s:B.wait});return}
+      if(B.manual&&(u.side==='h'||(opt.manual2&&u.side==='f'))){B.wait=U.indexOf(u);log(`Au tour de ${u.name}.`,'turn',{s:B.wait});return}
       act(u);endTurn(u);if(check())return;
     }
   };
   B.setAuto=function(){B.manual=false;if(B.wait!=null){const u=U[B.wait];B.wait=null;act(u);endTurn(u);if(check())return}B.step()};
+  B.aiPick=()=>{if(B.wait==null)return null;const c=aiChoose(U[B.wait]);return{i:c.i,t:c.t?U.indexOf(c.t):null}};
   B.canTarget=(i,k)=>{const u=U[B.wait],s=u&&u.sk[i],t=U[k];if(!s||!t||!t.alive)return false;return s.tg==='e'?t.side!==u.side:s.tg==='a'?t.side===u.side:false};
   log('Le combat commence.','sys');
   leads.forEach(([lu,L])=>log(`Compétence de chef de ${lu.name} : ${leadText(L)}.`,'skill'));
@@ -1235,7 +1251,7 @@ function climbE(){
   const sum={label,win:false,fallen:[],levels:[],gems:0,gold:0,loot:[]};
   startBattle(party,eFoes(el),slots,sum,res=>{sum.win=res.win;
   casualties(res,sum,label);
-  if(res.win){
+  if(res.win){rareDrop(sum);
     if(f%10===0)sum.tomes=giveTomes(1);
     const r=eReward(f);r.shards*=shardMul();r.gold*=goldMul();sum.gems=r.gems;sum.gold=r.gold;sum.shards=r.shards;
     S.gems+=r.gems;S.gold+=r.gold;S.shards+=r.shards;
@@ -1342,7 +1358,7 @@ function evItem(slots,minRank){
   if(S.inv.length>=INV_MAX){const v=sellValue(it);S.gold+=v;return{sold:v}}
   S.inv.push(it);return{it};
 }
-function evEnd(sum,inst,res,pts){track('event');
+function evEnd(sum,inst,res,pts){track('event');if(res&&res.win!==false)rareDrop(sum);
   const p=evp(inst);p.pts+=pts;sum.note=[sum.note,`+${pts} points d’événement (${p.pts}/${MIL[2]})`].filter(Boolean).join(' · ');
   save();lastBattle={res,sum,idx:0,done:false,mode:'event'};busy=true;render();play();
 }
@@ -1615,7 +1631,7 @@ function gBossAttack(){
   const res=simulate(team,[boss],S.slots,12),dmg=b.hp-res.U.find(u=>u.side==='f').hp;
   b.hp-=dmg;g.contrib.__me=(g.contrib.__me||0)+dmg;
   const coins=Math.min(200,20+Math.floor(dmg/800));g.coins+=coins;gainGXp(dmg/400+30);
-  const sum={label:`Boss de guilde : ${b.n}`,win:true,fallen:[],levels:[],gems:0,gold:0,loot:[],head:`${fmtN(dmg)} dégâts infligés`,note:`+${coins} médailles de guilde`};
+  rareDrop(null);const sum={label:`Boss de guilde : ${b.n}`,win:true,fallen:[],levels:[],gems:0,gold:0,loot:[],head:`${fmtN(dmg)} dégâts infligés`,note:`+${coins} médailles de guilde`};
   glog(`Vous infligez ${fmtN(dmg)} dégâts à ${b.n}.`);
   if(b.hp<=0)bossKilled(sum);
   save();lastBattle={res,sum,idx:0,done:false,mode:'guild',gsub:'boss'};busy=true;render();play();
@@ -1755,7 +1771,7 @@ async function initPvp(){
   PV.unsub=PV.db.collection('drafts').onSnapshot(snap=>{
     if(!snap.metadata.fromCache)clearTimeout(timer);
     PV.status='online';PV.docs=snap.docs.map(x=>({id:x.id,...x.data()}));
-    pvpNames();lbSync();if((tab==='pvp'||tab==='rank')&&!busy)render();
+    pvpNames();lbSync();rtaSnap();if((tab==='pvp'||tab==='rank')&&!busy)render();
   },()=>{clearTimeout(timer);PV.status='offline';if(tab==='pvp'&&!busy)render()});
 }
 async function pvpNames(){
@@ -1845,7 +1861,8 @@ function renderRank(){
   if(rsub==='pvp'){
     const season=(online?PV.docs.filter(x=>x.sp):[]).map(x=>({me:x.id===PV.uid,label:lbName({...x,me:x.id===PV.uid}),v:x.sp})).sort((a,b)=>b.v-a.v).slice(0,50);
     const y=pvpStandings(d-1).slice(0,3),t=pvpStandings(d).slice(0,10);
-    body=`<section class="panel"><h2>Saison du Draft</h2>${st}${rankRows(season,x=>`${x.v} pts`)}<p class="note">Points de saison gagnés chaque jour selon la place au Draft de l’Oracle.</p></section>
+    const rtaL=(online?PV.docs.filter(x=>x.ra>0):[]).map(x=>({me:x.id===PV.uid,label:lbName({...x,me:x.id===PV.uid}),sub:`Ligue ${ROY_TIERS[tierOf(x.ra)].n}`,v:x.ra})).sort((a,b)=>b.v-a.v).slice(0,50);
+    body=`<section class="panel"><h2>RTA</h2>${st}${rankRows(rtaL,x=>`${x.v} pts`)}</section><section class="panel"><h2>Saison du Draft</h2>${st}${rankRows(season,x=>`${x.v} pts`)}<p class="note">Points de saison gagnés chaque jour selon la place au Draft de l’Oracle.</p></section>
       <section class="panel"><h2>Saison de l’arène royale</h2>${rankRows((online?PV.docs.filter(x=>x.rp):[]).map(x=>({me:x.id===PV.uid,label:lbName({...x,me:x.id===PV.uid}),sub:`Ligue ${ROY_TIERS[tierOf(x.rp)].n}`,v:x.rp})).sort((a,b)=>b.v-a.v).slice(0,50),x=>`${x.v} pts`)}</section>
       <section class="panel"><h2>Podium d’hier</h2>${rankRows(y.map(e=>({me:e.me,label:entryName(e)+(e.bot?' (Ombre)':''),v:e.pts})),x=>`${x.v} pts`)}</section>
       <section class="panel"><h2>Aujourd’hui, en direct</h2>${rankRows(t.map(e=>({me:e.me,label:entryName(e)+(e.bot?' (Ombre)':''),sub:`${e.w} V · ${e.dr} N · ${e.l} D`,v:e.pts})),x=>`${x.v} pts`)}<button class="btn sm" data-act="tab" data-id="pvp" style="margin-top:8px">Aller au Draft</button></section>`;
@@ -1965,6 +1982,218 @@ function renderRoyale(){
     <section class="panel"><h2>Ligue ${ROY_TIERS[T].n} · aujourd’hui${mi>=0?` · vous êtes ${mi+1}ᵉ`:''}</h2>${F.rank.length?`<div class="stand">${rows}</div>`:'<p class="empty">Personne n’est encore inscrit.</p>'}
       ${mi>=0?`<button class="btn sm" data-act="roylog" style="margin-top:8px">${royShowLog?'Masquer le récit':'Voir le récit du combat'}</button>${royShowLog?`<div class="log" style="margin-top:8px;max-height:320px">${F.log.map(x=>`<p class="${x.c}">${esc(x.t)}</p>`).join('')}</div>`:''}`:''}
       <p class="note">Récompenses en ligue ${ROY_TIERS[T].n} (à réclamer le lendemain) : 1ʳᵉ place ${fmtR(royReward(1,10,T))} · 2ᵉ et 3ᵉ ${fmtR(royReward(2,10,T))} · première moitié ${fmtR(royReward(4,10,T))} · autres ${fmtR(royReward(9,10,T))}. Plus des points d’arène pour le classement de saison.</p></section>`;
+}
+
+
+/* ---------- RTA : arène en temps réel (choix 1-2-2-2-2-1, 1 bannissement, combat manuel synchronisé) ---------- */
+const RTA_POOL=15,RTA_PICK_MS=30000,RTA_BAN_MS=20000,RTA_TURN_MS=30000,RTA_AFK_MS=75000,RTA_BOT_MS=30000;
+const RTA_SEQ=['A','B','B','A','A','B','B','A','A','B'];
+let RT={st:'idle',ignore:new Set()},rtaIdleSent=false;
+function rtaInit(){if(!S.rta)S.rta={pts:0,w:0,l:0,fw:-1}}
+const rtaPts=()=>(S&&S.rta&&S.rta.pts)||0;
+const hPow=s=>Math.round(s.hp*.5+s.atk*4+s.def*3+s.spd*20);
+function rtaCard(h,i){const s=stats(h);return{k:i,name:h.name,cls:h.cls,el:h.el,leg:h.leg||null,seed:h.seed||0,stars:h.stars,lvl:h.lvl,skl:(h.skl||[1,1,1]).slice(0,3),rc:{hp:s.hp,atk:s.atk,def:s.def,spd:s.spd,crit:s.crit,cdmg:s.cdmg,pen:s.pen,acc:s.acc||0,res:s.res==null?15:s.res},eff:setEffOf(h),pw:hPow(s)}}
+function rtaMyPool(){const seen=new Set();return JSON.parse(JSON.stringify(S.heroes.map(h=>({h,p:hPow(stats(h))})).sort((a,b)=>b.p-a.p).filter(x=>{if(seen.has(x.h.name))return false;seen.add(x.h.name);return true}).slice(0,RTA_POOL).map((x,i)=>rtaCard(x.h,i))))}
+function rtaPoolOk(p){return Array.isArray(p)&&p.length>=4&&p.length<=RTA_POOL&&p.every((c,i)=>c&&c.k===i&&CLASSES[c.cls]&&c.rc&&['hp','atk','def','spd'].every(k=>Number.isFinite(c.rc[k])&&c.rc[k]>0&&c.rc[k]<1e7))}
+function rtaClean(p){return p.map(c=>({...c,leg:c.leg&&LEGENDS[c.leg]?c.leg:null,eff:{extra:!!(c.eff&&c.eff.extra),vamp:!!(c.eff&&c.eff.vamp),stun:!!(c.eff&&c.eff.stun),counter:!!(c.eff&&c.eff.counter)},skl:Array.isArray(c.skl)?c.skl.map(x=>Math.max(1,Math.min(SK_MAX,x|0||1))):[1,1,1]}))}
+const rtaR=f=>{const o=RNG;RNG=RT.rng;try{return f()}finally{RNG=o}};
+const rtaOppName=()=>RT.bot?RT.op.name:((PV.docs.find(x=>x.id===RT.opp)||{}).p||PV.names[RT.opp]||'Joueur');
+async function rtaWrite(o){
+  if(PV.status!=='online'||!PV.canWrite||!PV.uid||!PV.db)return;
+  const ref=PV.db.collection('drafts').doc(PV.uid),mine=PV.docs.find(x=>x.id===PV.uid),data={rta:{...o,at:Date.now()},ra:rtaPts(),p:(S.settings&&S.settings.name)||null};
+  try{if(mine||RT.created)await ref.update(data);else{RT.created=true;await ref.set({...data,sp:0,day:null,draft:null})}}catch(e){}
+}
+function rtaPush(){if(RT.bot)return;rtaWrite({st:RT.st==='queue'?'q':'m',t:RT.t0,tier:tierOf(rtaPts()),mid:RT.mid||null,opp:RT.opp||null,pool:RT.my.pool,picks:RT.my.picks,ban:RT.my.ban,mv:RT.my.mv,end:RT.end||null})}
+function rtaStart(){
+  if(busy||['queue','confirm','pick','ban','fight'].includes(RT.st))return;rtaInit();
+  const pool=rtaMyPool();if(pool.length<4)return toast('Il faut au moins 4 héros différents pour la RTA.');
+  if(lastBattle&&lastBattle.mode==='rta')lastBattle=null;
+  RT={st:'queue',t0:Date.now(),my:{pool,picks:[],ban:null,mv:[]},op:null,ignore:RT.ignore||new Set(),created:RT.created};
+  rtaPush();render();
+}
+function rtaCancel(){if(RT.st!=='queue'&&RT.st!=='confirm')return;RT.st='idle';rtaWrite({st:'idle'});render()}
+function rtaMatch(){
+  if(PV.status!=='online'||RT.st!=='queue')return;
+  const now=Date.now(),others=PV.docs.filter(d=>d.id!==PV.uid&&d.rta&&!RT.ignore.has(d.id)&&now-(d.rta.at||0)<120000&&rtaPoolOk(d.rta.pool));
+  const inv=others.find(d=>d.rta.st==='m'&&d.rta.opp===PV.uid&&!d.rta.end&&(!d.rta.picks||!d.rta.picks.length)&&now-(d.rta.at||0)<30000);
+  if(inv)return rtaBegin(inv,inv.rta.mid);
+  const myT=tierOf(rtaPts()),waited=now-RT.t0;
+  const c=others.filter(d=>d.rta.st==='q'&&(waited>15000||Math.abs((d.rta.tier||0)-myT)<=1)).sort((a,b)=>(a.rta.t||0)-(b.rta.t||0))[0];
+  if(c){const a=PV.uid,b=c.id;rtaBegin(c,[a<b?a:b,a<b?b:a,Math.min(RT.t0,c.rta.t||RT.t0)].join('|'))}
+}
+function rtaBegin(d,mid){
+  RT.opp=d.id;RT.mid=mid;RT.host=PV.uid<d.id;RT.hostMe=RT.host;RT.bot=false;RT.st='confirm';RT.cT=Date.now();
+  RT.op={pool:rtaClean(d.rta.pool),picks:[],ban:null,mv:[]};RT.seed=Math.abs(hash(mid));RT.role=(RT.seed%2===0)===RT.hostMe?'A':'B';
+  rtaPush();
+}
+function rtaBot(){
+  const my=RT.my.pool,avg=k=>my.reduce((t,c)=>t+c.rc[k],0)/my.length,t=tierOf(rtaPts()),f=Math.min(1.05,.86+.04*t);
+  const used=new Set(my.map(c=>c.name)),cls=Object.keys(CLASSES),pool=[];
+  for(let i=0;i<RTA_POOL;i++){const c=cls[i%5],nm=namesOf(c).filter(n=>!used.has(n)),name=nm.length?pick(nm):pick(namesOf(c));used.add(name);const m=f*(.9+R()*.2),cm=CLASSES[c],am=avg('atk')/18,hm=avg('hp')/120,dm=avg('def')/7;
+    const rc={hp:Math.round(cm.hp*hm*m),atk:Math.round(cm.atk*am*m),def:Math.round(cm.def*dm*m),spd:Math.round(cm.spd+avg('spd')-10),crit:Math.round(avg('crit')),cdmg:Math.round(avg('cdmg')),pen:Math.round(avg('pen')),acc:Math.round(avg('acc')),res:Math.round(avg('res'))};
+    pool.push({k:i,name,cls:c,el:randEl(),leg:null,seed:Math.floor(R()*1e9),stars:Math.max(1,Math.round(my.reduce((t,x)=>t+x.stars,0)/my.length)),lvl:1,skl:[1,1,1],rc,eff:{},pw:hPow(rc)})}
+  RT.bot=true;RT.hostMe=true;RT.opp=null;RT.st='pick';RT.seed=Math.floor(R()*1e9);RT.role=R()<.5?'A':'B';
+  RT.op={pool,picks:[],ban:null,mv:[],name:pick(ROY_BOTS)};RT.turnN=-1;
+  rtaWrite({st:'idle'});toast('Aucun joueur disponible : une Ombre de votre ligue vous affronte.');render();
+}
+const rtaN=()=>RT.my.picks.length+RT.op.picks.length;
+const rtaOwner=()=>rtaN()<10?(RTA_SEQ[rtaN()]===RT.role?'me':'op'):null;
+const rtaMyTurn=()=>{const B=RT.B;return!!B&&B.wait!=null&&(B.U[B.wait].side==='h')===RT.hostMe};
+function rtaLeft(){const n=RTA_SEQ.slice(rtaN()),o=n[0];let k=0;while(k<n.length&&n[k]===o)k++;return k}
+function rtaPick(k){
+  if(RT.st!=='pick'||rtaOwner()!=='me'||RT.my.picks.includes(k)||!RT.my.pool.some(c=>c.k===k))return;
+  RT.my.picks.push(k);rtaPush();rtaAdvance();render();
+}
+function rtaAutoPick(side){const P=side.pool.filter(c=>!side.picks.includes(c.k)).sort((a,b)=>b.pw-a.pw);if(!P.length)return;const c=side===RT.op?P[Math.min(P.length-1,Math.floor(R()*Math.min(3,P.length)))]:P[0];side.picks.push(c.k)}
+function rtaBan(k){if(RT.st!=='ban'||RT.my.ban!=null||!RT.op.picks.includes(k))return;RT.my.ban=k;rtaPush();rtaAdvance();render()}
+function rtaAdvance(){
+  const now=Date.now();
+  if(RT.st==='pick'){if(rtaN()!==RT.turnN){RT.turnN=rtaN();RT.phaseT=now}if(rtaN()>=10){RT.st='ban';RT.phaseT=now;if(RT.bot)RT.op.ban=RT.my.picks.map(k=>RT.my.pool.find(c=>c.k===k)).sort((a,b)=>b.pw-a.pw)[0].k}}
+  if(RT.st==='ban'&&RT.my.ban!=null&&RT.op.ban!=null)rtaFight();
+}
+function rtaTeam(side,banned,pre){
+  const units=side.picks.filter(k=>k!==banned).slice(0,4).map((k,i)=>{const c=side.pool.find(x=>x.k===k);return{...c,id:pre+i,hp:c.rc.hp}});
+  const sl=[null,null,null,null,null,null],m=units.filter(u=>MELEE(u.cls)),r=units.filter(u=>!MELEE(u.cls));
+  m.slice(0,3).forEach((u,i)=>sl[i]=u.id);
+  [...r,...m.slice(3)].forEach(u=>{const i=[3,4,5,0,1,2].find(i=>!sl[i]);sl[i]=u.id});
+  if(!sl[0]){const j=sl.findIndex(Boolean);sl[0]=sl[j];sl[j]=null}
+  return{units,sl};
+}
+function rtaFight(){
+  const H=RT.hostMe?RT.my:RT.op,G=RT.hostMe?RT.op:RT.my,hb=RT.hostMe?RT.op.ban:RT.my.ban,gb=RT.hostMe?RT.my.ban:RT.op.ban;
+  const A=rtaTeam(H,hb,'H'),Bt=rtaTeam(G,gb,'G');
+  RT.rng=rng(RT.seed);RT.pm=0;RT.po=0;RT.st='fight';RT.turnT=Date.now();RT.lastOpp=Date.now();
+  const B=rtaR(()=>battleNew(A.units,Bt.units,A.sl,25,{manual:true,manual2:!RT.bot,foeHeroes:true,foeSlots:Bt.sl}));
+  rtaR(()=>B.step());RT.B=B;
+  const sum={label:`RTA contre ${rtaOppName()}`,win:false,fallen:[],levels:[],gems:0,gold:0,loot:[]};
+  lastBattle={res:B,sum,idx:0,done:false,mode:'rta',after:()=>rtaEnd(),sel:0,rta:true,flip:!RT.hostMe};
+  busy=true;tab='pvp';psub='rta';render();play();
+}
+function rtaPump(){
+  const B=RT.B;if(!B||RT.st!=='fight')return;let moved=false;
+  while(!B.over&&B.wait!=null){
+    const u=B.U[B.wait],mine=(u.side==='h')===RT.hostMe,side=mine?RT.my:RT.op,pk=mine?'pm':'po',c=side.mv[RT[pk]];
+    if(!c)break;RT[pk]++;
+    const ch=c&&u.sk[c.i]&&!(u.cd[c.i]>0)?{i:c.i,t:Number.isInteger(c.t)&&c.t>=0&&c.t<B.U.length?c.t:null}:{i:0,t:null};
+    rtaR(()=>B.step(ch));moved=true;RT.turnT=Date.now();
+  }
+  if(moved&&lastBattle&&lastBattle.rta){lastBattle.sel=0;bctlRefresh();play()}
+}
+function rtaMove(choice){if(!rtaMyTurn())return;RT.my.mv.push({i:choice.i|0,t:choice.t!=null?choice.t:null});rtaPush();rtaPump()}
+function rtaHostWins(B){
+  const lh=B.U.filter(u=>u.side==='h'&&u.alive).length,lf=B.U.filter(u=>u.side==='f'&&u.alive).length;
+  if(lh&&!lf)return true;if(lf&&!lh)return false;
+  const r=sd=>{const a=B.U.filter(u=>u.side===sd);return a.reduce((t,u)=>t+Math.max(0,u.alive?u.hp:0)/u.max,0)/a.length};return r('h')>=r('f');
+}
+function rtaReward(win){
+  rtaInit();const t=tierOf(S.rta.pts),bot=RT.bot,d=dayIdx();let dp,gems,sh=0,tome=0;
+  if(win){dp=bot?10:20;gems=bot?30:60;sh=bot?2:5;S.rta.w++;if(S.rta.fw!==d){S.rta.fw=d;tome=giveTomes(1)}}
+  else{dp=t>=2?(bot?-5:-10):(bot?0:-5);gems=bot?5:15;S.rta.l++}
+  S.rta.pts=Math.max(0,S.rta.pts+dp);S.gems+=gems;S.shards+=sh;const nt=tierOf(S.rta.pts);
+  RT.res={win,dp,gems,sh,tome,t,nt};save();if(RT.end!=='ff')RT.end=win?'w':'l';if(RT.bot)rtaWrite({st:'idle'});else rtaPush();
+  return RT.res;
+}
+function rtaNote(r){return`${r.dp>=0?'+':''}${r.dp} points RTA (${S.rta.pts}, ligue ${ROY_TIERS[r.nt].n})${r.sh?` · +${r.sh} éclats`:''}${r.tome?' · +1 Tome de maîtrise (première victoire du jour)':''}${r.nt>r.t?` · Promotion en ligue ${ROY_TIERS[r.nt].n} !`:r.nt<r.t?` · Relégation en ligue ${ROY_TIERS[r.nt].n}.`:''}`}
+function rtaEnd(){
+  if(RT.st!=='fight')return;const B=RT.B,timeout=B.U.some(u=>u.side==='h'&&u.alive)&&B.U.some(u=>u.side==='f'&&u.alive);
+  const win=rtaHostWins(B)===RT.hostMe,r=rtaReward(win),s=lastBattle.sum;
+  s.win=win;s.head=win?`Victoire contre ${rtaOppName()} !`:`Défaite contre ${rtaOppName()}.`;s.gems=r.gems;s.note=(timeout?'Temps écoulé : victoire aux PV restants. ':'')+rtaNote(r);
+  RT.st='done';
+}
+function rtaResult(win,why){
+  if(['done','idle'].includes(RT.st))return;
+  const r=rtaReward(win);RT.why=why;RT.st='done';
+  if(lastBattle&&lastBattle.rta&&!lastBattle.done){clearTimeout(timer);lastBattle.applied=true;lastBattle.done=true;busy=false;const s=lastBattle.sum;s.win=win;s.head=win?`Victoire : ${why}`:`Défaite : ${why}`;s.gems=r.gems;s.note=rtaNote(r)}
+  toast(`${win?'Victoire':'Défaite'} : ${why}`);render();
+}
+function rtaQuit(){if(!['pick','ban','fight'].includes(RT.st))return;RT.end='ff';rtaPush();rtaResult(false,'vous avez abandonné.')}
+function rtaSnap(){
+  if(!S||PV.status!=='online')return;
+  if(!rtaIdleSent){rtaIdleSent=true;const me=PV.docs.find(x=>x.id===PV.uid);if(me&&me.rta&&me.rta.st!=='idle'&&RT.st==='idle')rtaWrite({st:'idle'})}
+  if(RT.st==='queue'){rtaMatch();return}
+  if(RT.bot||!['confirm','pick','ban','fight'].includes(RT.st))return;
+  const d=PV.docs.find(x=>x.id===RT.opp),r=d&&d.rta;
+  if(RT.st==='confirm'){
+    if(r&&r.st==='m'&&r.opp===PV.uid&&r.mid===RT.mid){RT.st='pick';RT.turnN=-1;RT.lastOpp=Date.now();rtaAdvance();toast(`Adversaire trouvé : ${rtaOppName()} !`);if(tab==='pvp'&&!busy)render()}
+    else if(r&&r.st==='m'&&r.opp!==PV.uid){RT.ignore.add(RT.opp);RT.st='queue';RT.opp=null;RT.mid=null;rtaPush()}
+    return;
+  }
+  if(!r||r.mid!==RT.mid)return;
+  if(r.end==='ff'&&RT.st!=='done')return rtaResult(true,`${rtaOppName()} a abandonné.`);
+  const sig=JSON.stringify([r.picks,r.ban,(r.mv||[]).length]);
+  if(sig!==RT.oSig){RT.oSig=sig;RT.lastOpp=Date.now();
+    const ks=new Set(RT.op.pool.map(c=>c.k));RT.op.picks=(Array.isArray(r.picks)?r.picks:[]).filter(k=>ks.has(k)).slice(0,5);
+    RT.op.ban=Number.isInteger(r.ban)&&RT.my.picks.includes(r.ban)?r.ban:null;RT.op.mv=Array.isArray(r.mv)?r.mv:[];
+    if(RT.st==='fight')rtaPump();else{rtaAdvance();if(tab==='pvp'&&!busy)render()}}
+}
+function rtaTick(){
+  if(!S)return;const now=Date.now(),st=RT.st;
+  if(st==='queue'){rtaMatch();if(RT.st==='queue'&&(now-RT.t0>RTA_BOT_MS||(PV.status!=='online'&&now-RT.t0>3000)||!PV.canWrite))rtaBot()}
+  else if(st==='confirm'){if(now-RT.cT>12000){RT.ignore.add(RT.opp);RT.st='queue';RT.opp=null;RT.mid=null;rtaPush()}}
+  else if(st==='pick'){
+    rtaAdvance();const o=rtaOwner();
+    if(o==='me'&&now-RT.phaseT>RTA_PICK_MS){rtaAutoPick(RT.my);rtaPush();rtaAdvance();if(tab==='pvp'&&!busy)render()}
+    else if(o==='op'&&RT.bot&&now-RT.phaseT>1300){rtaAutoPick(RT.op);rtaAdvance();if(tab==='pvp'&&!busy)render()}
+    else if(o==='op'&&!RT.bot&&now-RT.phaseT>RTA_PICK_MS*2)rtaResult(true,`${rtaOppName()} ne répond plus.`);
+  }
+  else if(st==='ban'){
+    if(RT.my.ban==null&&now-RT.phaseT>RTA_BAN_MS){RT.my.ban=RT.op.picks.map(k=>RT.op.pool.find(c=>c.k===k)).sort((a,b)=>b.pw-a.pw)[0].k;rtaPush();rtaAdvance();if(tab==='pvp'&&!busy)render()}
+    else if(RT.op.ban==null&&!RT.bot&&now-RT.phaseT>RTA_BAN_MS*3)rtaResult(true,`${rtaOppName()} ne répond plus.`);
+  }
+  else if(st==='fight'){
+    const B=RT.B,b=lastBattle;
+    if(B&&!B.over&&B.wait!=null){
+      if(rtaMyTurn()){if(now-RT.turnT>RTA_TURN_MS+(b&&b.idx<b.res.ev.length?5000:0)){rtaMove(B.aiPick());toast('Temps écoulé : votre héros agit automatiquement.')}}
+      else if(!RT.bot&&now-Math.max(RT.turnT,RT.lastOpp)>RTA_AFK_MS)rtaResult(true,`${rtaOppName()} ne répond plus.`);
+    }
+  }
+  document.querySelectorAll('[data-rtclk]').forEach(el=>{const v=el.getAttribute('data-rtclk');el.textContent=rtaClock(v)});
+}
+function rtaClock(v){const now=Date.now(),sec=ms=>Math.max(0,Math.ceil(ms/1000))+' s';
+  if(v==='q')return sec(now-RT.t0);
+  if(v==='p')return sec((RT.phaseT||now)+RTA_PICK_MS-now);
+  if(v==='b')return sec((RT.phaseT||now)+RTA_BAN_MS-now);
+  if(v==='f')return rtaMyTurn()?sec(RT.turnT+RTA_TURN_MS-now):'…';return''}
+setInterval(rtaTick,1000);
+function rtaMini(c,act,on,dis,extra){const h={name:c.name,cls:c.cls,el:c.el,stars:c.stars,leg:c.leg,seed:c.seed};
+  return`<button class="bh pcard r${c.stars}${on?' sel':''}${extra||''}" ${act?`data-act="${act}" data-id="${c.k}"`:''} ${dis?'disabled':''}><div class="ava">${portrait(h)}</div><span class="bn">${esc(c.name)}</span><span class="fmeta">${elChip(c.el)}</span><span class="fmeta">${CLASSES[c.cls].n} · ${c.stars}★</span><span class="fmeta">Puissance ${fmtN(c.pw)}</span></button>`}
+function rtaSlots(side,banned,label,mine){const cs=side.picks.map(k=>side.pool.find(c=>c.k===k));
+  return`<div class="rtateam${mine?' mine':''}"><div class="rtalab">${label}</div><div class="rtaslots">${Array.from({length:5},(_,i)=>{const c=cs[i];if(!c)return'<div class="rtaslot empty"></div>';const h={name:c.name,cls:c.cls,stars:c.stars,leg:c.leg,seed:c.seed};return`<div class="rtaslot${c.k===banned?' banned':''}" title="${esc(c.name)}">${portrait(h)}<span>${esc(c.name)}</span></div>`}).join('')}</div></div>`}
+function renderRta(){
+  rtaInit();const pts=rtaPts(),ct=tierOf(pts),nx=ROY_TIERS[ct+1],st=RT.st;
+  const online=PV.status==='online'?'<span class="good">En ligne</span>':PV.status==='offline'?'<span class="bad">Hors ligne : vous affronterez des Ombres (IA).</span>':'<span class="meta">Connexion…</span>';
+  if(st==='fight'||(st==='done'&&lastBattle&&lastBattle.mode==='rta')){
+    const b=lastBattle;
+    const bar=st==='fight'?`<section class="panel rtabar"><div><b>Vous</b> contre <b>${esc(rtaOppName())}</b>${RT.bot?' <span class="meta">(IA)</span>':''}</div><div class="meta">Tour : <b data-rtclk="f">${rtaClock('f')}</b> · 30 s par action, sinon votre héros agit seul.</div><button class="btn sm warn" data-act="rtaquit">Abandonner</button></section>`
+      :`<section class="panel"><button class="btn prime" data-act="rtago">Nouvelle recherche</button> <button class="btn" data-act="rtaback">Retour</button></section>`;
+    return bar+(b?renderBattle():'');
+  }
+  if(st==='queue'||st==='confirm')return`<section class="panel rtaq"><div class="spin" aria-hidden="true"></div><h2>${st==='confirm'?'Adversaire trouvé, connexion…':'Recherche d’un adversaire…'}</h2><div class="meta">${st==='queue'?`Depuis <b data-rtclk="q">${rtaClock('q')}</b> · ligue ${ROY_TIERS[ct].n} d’abord, toutes les ligues après 15 s, une Ombre (IA) de votre ligue après 30 s.`:'Synchronisation avec l’autre joueur.'}</div><button class="btn" data-act="rtacancel" style="margin-top:10px">Annuler</button></section>`;
+  if(st==='pick'){
+    const o=rtaOwner(),left=rtaLeft();
+    return`<section class="panel"><h2>Phase de choix · ${rtaN()}/10</h2>
+      <p class="rtastat ${o==='me'?'good':''}">${o==='me'?`À vous : choisissez ${left} héros · <b data-rtclk="p">${rtaClock('p')}</b>`:`${esc(rtaOppName())} choisit…`}</p>
+      ${rtaSlots(RT.my,null,'Vous',true)}${rtaSlots(RT.op,null,esc(rtaOppName()),false)}
+      <p class="note">Ordre de choix 1-2-2-2-2-1 (${RT.role==='A'?'vous commencez':'l’adversaire commence'}). Ensuite, chacun bannit un héros adverse et le combat se joue à 4 contre 4, en manuel.</p></section>
+      <section class="panel"><h2>Vos héros</h2><div class="bench">${RT.my.pool.map(c=>rtaMini(c,'rtapick',RT.my.picks.includes(c.k),o!=='me'||RT.my.picks.includes(c.k))).join('')}</div></section>`;
+  }
+  if(st==='ban'){
+    return`<section class="panel"><h2>Bannissement</h2>
+      <p class="rtastat ${RT.my.ban==null?'good':''}">${RT.my.ban==null?`Touchez un héros adverse à bannir · <b data-rtclk="b">${rtaClock('b')}</b>`:`En attente du bannissement de ${esc(rtaOppName())}…`}</p>
+      <div class="bench">${RT.op.picks.map(k=>RT.op.pool.find(c=>c.k===k)).map(c=>rtaMini(c,'rtaban',RT.my.ban===c.k,RT.my.ban!=null,RT.my.ban===c.k?' banned':'')).join('')}</div></section>
+      <section class="panel">${rtaSlots(RT.my,null,'Votre équipe',true)}</section>`;
+  }
+  const docs=PV.status==='online'?PV.docs.filter(x=>x.ra>0||x.id===PV.uid):[];
+  const top=docs.map(x=>({me:x.id===PV.uid,label:lbName({...x,me:x.id===PV.uid}),sub:`Ligue ${ROY_TIERS[tierOf(x.id===PV.uid?pts:x.ra||0)].n}`,v:x.id===PV.uid?pts:x.ra||0})).sort((a,b)=>b.v-a.v).slice(0,10);
+  const res=st==='done'&&RT.res?`<section class="panel"><h2>${RT.res.win?'Victoire':'Défaite'}</h2><p>${esc(RT.why||'')}</p><div class="meta">${RT.res.gems?`+${RT.res.gems} cristaux · `:''}${rtaNote(RT.res)}</div></section>`:'';
+  return`${res}<section class="panel"><h2>Arène en temps réel</h2>
+    <div class="league"><div>${tierTag(ct)}<b>${pts} points RTA</b> · ${S.rta.w} V · ${S.rta.l} D</div><div class="meta">${nx?`Ligue ${nx.n} à ${nx.min} points`:'Ligue la plus haute'}</div><div class="bar"><i style="width:${nx?Math.min(100,(pts-ROY_TIERS[ct].min)/(nx.min-ROY_TIERS[ct].min)*100):100}%;background:${ROY_TIERS[ct].c}"></i></div></div>
+    <p class="meta" style="margin:8px 0">${online}</p>
+    <button class="btn prime big" data-act="rtago" ${busy?'disabled':''}>Rechercher un adversaire</button>
+    <p class="note">Comme dans une arène en temps réel : vous affrontez un autre joueur connecté, de votre ligue en priorité. Chacun choisit 5 héros dans sa collection (ordre 1-2-2-2-2-1), bannit 1 héros adverse, puis vous jouez à 4 contre 4 en manuel, une action chacun à son tour (30 s maximum). Équipement, sets et niveaux de compétences comptent. Personne ne meurt en RTA.</p>
+    <p class="note">Victoire : +20 points, 60 cristaux, 5 éclats, et 1 Tome de maîtrise pour la première victoire du jour. Défaite : −5 points (−10 à partir de l’Or). Si personne n’est disponible après 30 s, une Ombre (IA) vous affronte pour des gains réduits.</p></section>
+    <section class="panel"><h2>Vos héros de RTA · ${Math.min(RTA_POOL,new Set(S.heroes.map(h=>h.name)).size)}</h2><p class="meta" style="margin:0 0 8px">Vos ${RTA_POOL} héros les plus puissants (un seul exemplaire par nom).</p><div class="bench">${rtaMyPool().map(c=>rtaMini(c,null,false,false)).join('')}</div></section>
+    <section class="panel"><h2>Classement RTA</h2>${rankRows(top,x=>`${x.v} pts`)}</section>`;
 }
 
 /* ---------- Chat global ---------- */
@@ -2237,7 +2466,7 @@ function questAlert(){
 }
 function showIntro(i=0){
   const pages=[
-    ['Bienvenue, Invocateur','La Tour d’Appel s’est réveillée. Ses 250 étages grouillent de monstres, et seuls les héros que vous invoquez peuvent la gravir. Attention : <b>la mort est définitive</b>. Un héros dont les PV tombent à 0 quitte votre équipe et rejoint le Mémorial. Soignez-les à l’Auberge entre deux étages ; l’Oracle permet exceptionnellement de ressusciter un héros tombé 5 heures plus tard, depuis le Mémorial.'],
+    ['Bienvenue, Invocateur','La Tour d’Appel s’est réveillée. Ses 250 étages grouillent de monstres, et seuls les héros que vous invoquez peuvent la gravir. Attention : <b>la mort est définitive</b>. Un héros dont les PV tombent à 0 quitte votre équipe et rejoint le Mémorial. Soignez-les à l’Auberge entre deux étages ; une très rare Larme de l’Oracle permet de le ramener au Mémorial, 5 heures après sa chute, mais au niveau 1.'],
     ['Votre première équipe','Invoquez des héros au portail, placez-les dans la formation (les Gardiens et Guerriers devant, les Archers, Mages et Soigneurs derrière), puis lancez le combat. Les éléments et les synergies de classe font la différence.'],
     ['Devenir plus fort','Équipez vos héros grâce aux donjons, améliorez leurs pièces, faites-les monter d’étoiles avec les éclats, et suivez le Guide et les Missions du jour : ils vous montrent toujours quoi faire ensuite.']
   ];
@@ -2294,7 +2523,7 @@ function afkClears(){if(!S.best){S.afkT=Date.now();return 0}return Math.max(0,Ma
 function claimAfk(){
   const n=afkClears();if(n<1)return toast('Aucune victoire automatique pour l’instant.');
   const r=afkReward(S.best),g=n*r.gems,o=n*r.gold;
-  S.gems+=g;S.gold+=o;track('afk');
+  S.gems+=g;S.gold+=o;track('afk');rareDrop(null,n);
   S.afkT=n>=AFK_MAX?Date.now():S.afkT+n*AFK_MS;
   save();render();toast(`Farm auto : ${n} victoire${n>1?'s':''} à l’étage ${S.best}, +${g} cristaux et +${o} or.`);
 }
@@ -2388,7 +2617,7 @@ function climb(){
   const sum={floor:f,win:false,fallen:[],levels:[],gems:0,gold:0,loot:[]};
   startBattle(party,S.foes,S.slots,sum,res=>{sum.win=res.win;
   casualties(res,sum,`Étage ${f}`);
-  if(res.win){
+  if(res.win){rareDrop(sum);
     const boss=f%10===0;if(boss)sum.tomes=giveTomes(1);
     sum.gems=20+f*2+(boss?100:0);sum.gold=(50+f*12+(boss?150:0))*goldMul();
     S.gems+=sum.gems;S.gold+=sum.gold;
@@ -2474,7 +2703,7 @@ function runDungeon(k){
   const sum={label,win:false,fallen:[],levels:[],gems:0,gold:0,loot:[],sold:0};
   startBattle(party,dunFoes(k),S.slots,sum,res=>{sum.win=res.win;
   casualties(res,sum,label);
-  if(res.win){
+  if(res.win){rareDrop(sum);
     const feat=dunFeat()===k?2:1;if(feat>1)sum.feat=true;
     sum.gold=Math.round((d.type==='gold'?goldDunBase(L)*(.9+R()*.2)*feat:dunGold(L))*goldMul());S.gold+=sum.gold;
     grantXp(party,15+L*10,sum);
@@ -2529,11 +2758,11 @@ function updUnit(k,hp,max,a,x){
 }
 
 /* ---------- Combat manuel : choix de compétence et de cible ---------- */
-function bWait(){const b=lastBattle;if(!b||b.done||!b.res.step||b.res.over||b.res.wait==null||b.idx<b.res.ev.length)return null;return b}
+function bWait(){const b=lastBattle;if(!b||b.done||!b.res.step||b.res.over||b.res.wait==null||b.idx<b.res.ev.length)return null;if(b.rta&&!rtaMyTurn())return null;return b}
 function bctlHTML(){
   const b=lastBattle;if(!b||b.done)return'';
   const w=bWait();
-  if(!w){return`<button class="btn sm" data-act="speed">Vitesse ×${speed===1?3:1}</button>${b.res.step&&!b.res.over&&b.res.manual?'<button class="btn sm" data-act="bauto">Auto</button>':''}<button class="btn sm" data-act="skip">${b.res.step&&!b.res.over?'Passer l’animation':'Passer'}</button>`}
+  if(!w){return`${b.rta&&!b.res.over&&b.res.wait!=null&&b.idx>=b.res.ev.length?'<span class="rtawait">L’adversaire choisit son action…</span>':''}<button class="btn sm" data-act="speed">Vitesse ×${speed===1?3:1}</button>${b.res.step&&!b.res.over&&b.res.manual&&!b.rta?'<button class="btn sm" data-act="bauto">Auto</button>':''}<button class="btn sm" data-act="skip">${b.res.step&&!b.res.over?'Passer l’animation':'Passer'}</button>`}
   const u=w.res.U[w.res.wait],s=u.sk[w.sel]||u.sk[0];
   return`<div class="mturn"><div class="mwho">${CLASSES[u.cls]?portrait({name:u.name,cls:u.cls,stars:u.stars||1,leg:u.leg,seed:u.seed}):''}<div><b>Au tour de ${esc(u.name)}</b><div class="meta">${s.tg==='e'?'Touchez un ennemi pour attaquer.':s.tg==='a'?'Touchez un allié à soigner.':'Compétence sans cible : touchez Lancer.'}</div></div></div>
     <div class="skrow">${u.sk.map((k,i)=>`<button class="skb${w.sel===i?' on':''}" data-act="bsk" data-id="${i}" ${u.cd[i]>0?'disabled':''}><b>${k.n}</b><span>${u.cd[i]>0?`Prête dans ${u.cd[i]} tour${u.cd[i]>1?'s':''}`:i?`Recharge ${k.cd} tours`:'Attaque de base'}</span></button>`).join('')}</div>
@@ -2544,9 +2773,9 @@ function bctlRefresh(){
   const el=document.getElementById('bctl');if(el)el.innerHTML=bctlHTML();
   const w=bWait();document.querySelectorAll('.tok').forEach(t=>{const k=+t.id.slice(2);t.classList.toggle('turn',!!w&&k===w.res.wait);t.classList.toggle('tgt',!!w&&w.res.canTarget(w.sel,k))});
 }
-function bAct(choice){const b=bWait();if(!b)return;b.res.step(choice);b.sel=0;bctlRefresh();play()}
+function bAct(choice){const b=bWait();if(!b)return;if(b.rta){rtaMove(choice);return}b.res.step(choice);b.sel=0;bctlRefresh();play()}
 function bTarget(k){const b=bWait();if(!b)return;if(!b.res.canTarget(b.sel,k))return;const s=b.res.U[b.res.wait].sk[b.sel];bAct({i:b.sel,t:s.tg==='n'?null:k})}
-function bAuto(){const b=lastBattle;if(!b||b.done||!b.res.step||b.res.over)return;b.res.setAuto();bctlRefresh();play()}
+function bAuto(){const b=lastBattle;if(!b||b.done||!b.res.step||b.res.over||b.rta)return;b.res.setAuto();bctlRefresh();play()}
 function finish(){clearTimeout(timer);if(!lastBattle)return;if(lastBattle.res.step&&!lastBattle.res.over){lastBattle.idx=lastBattle.res.ev.length;render();bctlRefresh();return}applyEnd(lastBattle);if(!lastBattle.done&&!lastBattle.sndEnd&&document.getElementById('blog')){lastBattle.sndEnd=true;sfx(lastBattle.res.win?'win':'lose')}lastBattle.done=true;lastBattle.idx=lastBattle.res.ev.length;busy=false;render();if(S.storyPending!=null){const k=S.storyPending;S.storyPending=null;save();setTimeout(()=>showStory(k),400)}}
 
 function rest(){
@@ -2820,7 +3049,7 @@ function renderElemGuide(){
 }
 
 function renderBattle(){
-  const b=lastBattle,U=b.res.U,shown=b.done?b.res.ev.length:b.idx;
+  const b=lastBattle,U=b.res.U,shown=b.done?b.res.ev.length:b.idx,TOP=b.flip?'h':'f',BOT=b.flip?'f':'h';
   const se=shown>0?b.res.ev[shown-1]:b.res.ev[0],snap=se.hp,w=bWait();
   const unit=(u,k)=>{const hp=snap[k],a=se.a?se.a[k]:0,x=se.x?se.x[k]:'',cl=w?(k===w.res.wait?' turn':'')+(w.res.canTarget(w.sel,k)?' tgt':''):'',p=Math.round(hp/u.max*100),face=CLASSES[u.cls]?portrait({name:u.name,cls:u.cls,stars:u.stars||1,leg:u.leg,seed:u.seed}):foeIcon(u.name,u.el);
     return`<div class="tok${hp<=0?' dead':''}${u.boss?' boss':''}${u.row==='back'?' back':''}${cl}" id="ur${k}" data-act="btgt" data-id="${k}"><div class="tface" id="tk${k}">${face}${u.lead?'<span class="crown" title="Chef">♛</span>':''}</div><div class="tname"><i class="dot" style="--c:${ELEM[u.el]?ELEM[u.el].c:'#888'}"></i>${esc(u.name)}</div><div class="bar"><i id="bu${k}" class="${p<30?'low':p<60?'mid':''}" style="width:${p}%"></i></div><div class="atb"><i id="ba${k}" style="width:${a}%"></i></div><span class="thp" id="bt${k}">${hp}/${u.max}</span><div class="fxs" id="bf${k}" data-x="${x}">${fxChips(x)}</div></div>`};
@@ -2834,6 +3063,7 @@ function renderBattle(){
     ${s.done?`<div class="good" style="font-size:16px"><b>${s.done}</b></div>`:''}
     ${s.shards?`<div class="good"><b>+${s.shards} éclats d’étoile</b> (total ${S.shards})</div>`:''}
     ${s.tomes?`<div class="good"><b>+${s.tomes} Tome de maîtrise</b> (total ${S.tomes}) · palier de 10 étages</div>`:''}
+    ${s.tear?`<div class="good" style="font-size:16px"><b>Incroyable ! +${s.tear} Larme de l’Oracle</b> (résurrection au Mémorial)</div>`:''}
     ${s.unlock?`<div class="muted">Niveau ${s.unlock} débloqué.</div>`:''}
     ${s.levels.length?`<div class="muted">Progression : ${s.levels.join(', ')}</div>`:''}
     ${s.fallen.length?`<div class="fall">Tombés : ${s.fallen.join(', ')}. Leurs noms sont gravés au Mémorial et leur équipement retourne au sac.</div>`:''}
@@ -2841,9 +3071,9 @@ function renderBattle(){
   </div>`:'';
   return`<section class="panel"><h2>Combat · ${s.floor!=null?'étage '+s.floor:s.label}</h2><div class="battle">
     <div class="arena" id="arena"><div class="ult" id="ultb" hidden></div>
-      ${['back','front'].map(r=>{const x=U.map((u,k)=>u.side==='f'&&(u.row==='back')===(r==='back')?unit(u,k):'').join('');return x?`<div class="arow foes">${x}</div>`:''}).join('')}
+      ${['back','front'].map(r=>{const x=U.map((u,k)=>u.side===TOP&&(u.row==='back')===(r==='back')?unit(u,k):'').join('');return x?`<div class="arow foes">${x}</div>`:''}).join('')}
       <div class="vs">VS</div>
-      ${['front','back'].map(r=>{const x=U.map((u,k)=>u.side==='h'&&(u.row==='back')===(r==='back')?unit(u,k):'').join('');return x?`<div class="arow heroes">${x}</div>`:''}).join('')}</div>
+      ${['front','back'].map(r=>{const x=U.map((u,k)=>u.side===BOT&&(u.row==='back')===(r==='back')?unit(u,k):'').join('');return x?`<div class="arow heroes">${x}</div>`:''}).join('')}</div>
     ${b.done?'':`<div class="bctl" id="bctl">${bctlHTML()}</div>`}
     <div class="log" id="blog" aria-live="polite">${lines}</div>
     ${summary}
@@ -2968,6 +3198,7 @@ function renderRes(){
     {ic:ENERGYI,n:'Énergie',v:`${S.energy}/${ENERGY_MAX}`,use:`Entrer dans un donjon (${energyCost()} par combat).`,get:'+3 toutes les 2 minutes, missions du jour et leur coffre, boutique de guilde.'},
     {ic:STARIC,n:'Éclats d’étoile',v:S.shards,use:'Faire monter un héros d’étoile (Ascension).',get:'Sanctuaire des étoiles, PvP, Arène royale, événements.'},
     {ic:`<span class="resui">${ui('scroll')}</span>`,n:'Tomes de maîtrise',v:S.tomes||0,use:'Monter le niveau des compétences des héros.',get:'Tous les 10 étages de la Tour et des tours élémentaires, coffre des missions du jour, top du PvP et de l’Arène royale.'},
+    {ic:TEARI,n:'Larmes de l’Oracle',v:S.tears||0,use:'Ramener un héros tombé au Mémorial (5 h après sa chute, au niveau 1, il garde ses doublons).',get:'Très rare : 0,1 % par victoire dans la Tour, les donjons, les tours élémentaires, les événements, le boss de guilde et le farm automatique.'},
     {ic:`<span class="resui">${ui('trophy')}</span>`,n:'Points d’arène',v:rp,use:'Monter de ligue dans l’Arène royale.',get:'Classement quotidien de l’Arène royale.'},
     {ic:`<span class="resui">${ui('chest')}</span>`,n:'Médailles de guilde',v:g?g.coins:'—',use:'Acheter dans la boutique de guilde.',get:g?'Dons, boss de guilde, guerres de guilde.':'Rejoignez une guilde pour en obtenir.'}
   ];
@@ -3194,11 +3425,11 @@ function renderGuild(){
     ${body}`;
 }
 
-let psub='draft';
+let psub='rta';
 function renderPvp(){
   initPvp();
-  const tabs=`<div class="chips">${[['draft','Draft de l’Oracle'],['royale','Arène royale']].map(([k,l])=>`<button class="chipbtn" data-act="psub" data-id="${k}" aria-pressed="${psub===k}">${l}</button>`).join('')}</div>`;
-  return tabs+(psub==='royale'?renderRoyale():renderDraft());
+  const tabs=`<div class="chips">${[['rta','RTA'],['draft','Draft de l’Oracle'],['royale','Arène royale']].map(([k,l])=>`<button class="chipbtn" data-act="psub" data-id="${k}" aria-pressed="${psub===k}">${l}</button>`).join('')}</div>`;
+  return tabs+(psub==='rta'?renderRta():psub==='royale'?renderRoyale():renderDraft());
 }
 function renderDraft(){
   const L=pvpLocal(),d=L.day,pool=pvpPool(d),law=pvpLaw(d),w=L.work,myHand=pvpHand(d,myPvpKey());
@@ -3272,17 +3503,23 @@ function guideRibbon(){
 const REVIVE_MS=5*3600e3;
 const reviveLeft=x=>Math.max(0,(x.at||0)+REVIVE_MS-Date.now());
 const canRevive=()=>S.fallen.some(x=>x.cls&&CLASSES[x.cls]&&reviveLeft(x)<=0);
+/* Larme de l’Oracle : ressource très rare (0,1 % par victoire hors missions et PvP), 1 larme = 1 résurrection */
+const TEAR_RATE=.001;
+const TEARI='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5C9 7 6 10.4 6 14a6 6 0 0 0 12 0c0-3.6-3-7-6-11.5z" fill="#b98cff" stroke="#f1e4ff" stroke-width="1.2"/><path d="M9.5 14.5a2.6 2.6 0 0 0 2.4 2.6" stroke="#fff" stroke-width="1.3" fill="none" stroke-linecap="round"/></svg>';
+function rareDrop(sum,n){let k=0;for(let i=0;i<(n||1);i++)if(Math.random()<TEAR_RATE)k++;if(!k)return 0;S.tears=(S.tears||0)+k;if(sum)sum.tear=(sum.tear||0)+k;setTimeout(()=>toast(`Incroyable ! Vous trouvez ${k>1?k+' Larmes':'une Larme'} de l’Oracle.`),600);return k}
 function revive(i){
   const x=S.fallen[i];if(!x||busy||reviveLeft(x)>0||!CLASSES[x.cls])return;
-  S.fallen.splice(i,1);
+  if((S.tears||0)<1)return toast('Il faut une Larme de l’Oracle pour ramener un héros.');
+  S.tears--;S.fallen.splice(i,1);
   if(x.leg){const own=S.heroes.find(h=>h.leg===x.leg);if(own){if((own.awk||0)<AWK_MAX){withRatio(own,()=>{own.awk=(own.awk||0)+1})}else S.shards+=40;save();render();return toast(`${x.name} rejoint ${own.name} déjà présent : doublon absorbé.`)}}
   const base=x.hero||{name:x.name,cls:x.cls,stars:x.stars,lvl:x.lvl,xp:0,awk:x.awk||0,leg:x.leg||undefined,el:x.el||randEl(),seed:x.seed,trait:pick(TRAITS).k};
-  const h={...base,id:S.next++};delete h.hpMul;if(!h.leg)delete h.leg;h.hp=stats(h).hp;
-  S.heroes.push(h);sfx('heal');save();render();toast(`${h.name} revient à la vie ! Il attend dans la guilde (sans équipement).`);
+  const h={...base,id:S.next++,lvl:1,xp:0,skl:[1,1,1],awk:x.awk||base.awk||0};delete h.hpMul;if(!h.leg)delete h.leg;h.hp=stats(h).hp;
+  S.heroes.push(h);sfx('heal');save();render();toast(`${h.name} revient à la vie au niveau 1, avec ses ${h.awk} doublon${h.awk>1?'s':''}. Son équipement est dans le sac.`);
 }
 function renderMemorial(){
-  return`<section class="panel"><h2>Mémorial des tombés</h2><p class="note" style="margin-top:0">Exceptionnellement, l’Oracle accorde une seconde chance : 5 heures après sa chute, un héros peut revenir gratuitement, avec son niveau, ses étoiles, ses doublons et ses compétences. Son équipement est resté dans le sac.</p>
-  ${S.fallen.length?`<div class="fallen">${S.fallen.map(x=>`<div><div class="ava">${portrait(x)}</div><div class="info"><span><b>${x.name}</b> <span class="r${x.stars}"><span class="stars">${'★'.repeat(x.stars)}</span></span> · ${CLASSES[x.cls].n} niv. ${x.lvl}${x.awk?` · éveil ${x.awk}`:''}</span><span class="muted">${x.where||'Étage '+x.floor}, vaincu par ${x.killer||'l’inconnu'}</span>${CLASSES[x.cls]?(reviveLeft(x)<=0?`<button class="btn sm prime" data-act="revive" data-id="${S.fallen.indexOf(x)}" ${busy?'disabled':''}>Faire revivre · gratuit</button>`:`<span class="meta">Résurrection gratuite dans ${fmtLeft(reviveLeft(x))}</span>`):''}</div></div>`).join('')}</div>`:'<p class="empty">Aucun héros n’est encore tombé. Que cela dure.</p>'}
+  return`<section class="panel"><h2>Mémorial des tombés</h2><div class="tearbox"><span class="resic">${TEARI}</span><div><b>${S.tears||0} Larme${(S.tears||0)>1?'s':''} de l’Oracle</b><div class="meta">Ressource très rare : 0,1 % de chance à chaque victoire (Tour, donjons, tours élémentaires, événements, boss de guilde, farm automatique). Pas dans les missions ni en PvP.</div></div></div>
+  <p class="note">Une Larme ramène un héros tombé, au plus tôt 5 heures après sa chute. Il revient au <b>niveau 1</b>, compétences au niveau 1, et ne garde que ses étoiles et ses doublons. Son équipement est resté dans le sac.</p>
+  ${S.fallen.length?`<div class="fallen">${S.fallen.map(x=>`<div><div class="ava">${portrait(x)}</div><div class="info"><span><b>${x.name}</b> <span class="r${x.stars}"><span class="stars">${'★'.repeat(x.stars)}</span></span> · ${CLASSES[x.cls].n} niv. ${x.lvl}${x.awk?` · éveil ${x.awk}`:''}</span><span class="muted">${x.where||'Étage '+x.floor}, vaincu par ${x.killer||'l’inconnu'}</span>${CLASSES[x.cls]?(reviveLeft(x)<=0?`<button class="btn sm prime" data-act="revive" data-id="${S.fallen.indexOf(x)}" ${busy||(S.tears||0)<1?'disabled':''}>Faire revivre · 1 Larme</button>`:`<span class="meta">Résurrection possible dans ${fmtLeft(reviveLeft(x))} (1 Larme)</span>`):''}</div></div>`).join('')}</div>`:'<p class="empty">Aucun héros n’est encore tombé. Que cela dure.</p>'}
   </section>
   <section class="row"><button class="btn ${pendingReset?'warn':''}" data-act="reset">${pendingReset?'Confirmer : tout effacer ?':'Recommencer une partie'}</button><span class="muted" style="font-size:13px">${S.pulls} appels effectués au total.</span></section>`;
 }
@@ -3385,6 +3622,12 @@ document.addEventListener('click',e=>{
     case 'bauto':bAuto();break;
     case 'goform':fkey='main';tab='tower';sheetId=null;render();requestAnimationFrame(()=>{const el=document.getElementById('formation');if(el)el.scrollIntoView({behavior:'smooth',block:'start'})});break;
     case 'psub':psub=id;render();break;
+    case 'rtago':rtaStart();break;
+    case 'rtacancel':rtaCancel();break;
+    case 'rtapick':rtaPick(+id);break;
+    case 'rtaban':rtaBan(+id);break;
+    case 'rtaquit':rtaQuit();break;
+    case 'rtaback':RT.st='idle';if(lastBattle&&lastBattle.mode==='rta')lastBattle=null;render();break;
     case 'royreg':royRegister(+id);break;
     case 'royclaim':royClaim();break;
     case 'roylog':royShowLog=!royShowLog;render();break;
