@@ -600,6 +600,8 @@ img.art.foe{object-position:50% 50%}
 .rkn{min-width:26px;text-align:center;font-weight:800;color:#8fa8c8}
 .rkn.top1{color:#ffd35a;text-shadow:0 0 8px rgba(255,211,90,.6)}.rkn.top2{color:#d9e3f0}.rkn.top3{color:#e0a36a}
 .rkv{font-weight:700;white-space:nowrap;color:#bff0ff}
+.tier{display:inline-block;margin-right:8px;padding:2px 9px;border-radius:999px;font-weight:800;font-size:12px;color:#06101f;background:var(--tc);box-shadow:0 0 10px color-mix(in srgb,var(--tc) 60%,transparent)}
+.league{display:grid;gap:4px;margin-top:8px;padding:10px;border:1px solid rgba(127,220,255,.35);border-radius:8px;background:rgba(6,14,32,.6)}
 </style>
 
 <div class="app">
@@ -1748,7 +1750,7 @@ async function pvpSubmit(){
     if(PV.writing)return;PV.writing=true;
     const mine=PV.docs.find(x=>x.id===PV.uid)||{};
     const keep=mine.day===d?{prevDay:mine.prevDay??null,prev:mine.prev??null}:{prevDay:mine.day??null,prev:mine.draft??null};
-    try{await PV.db.collection('drafts').doc(PV.uid).set({day:d,draft:dr,...keep,sp:mine.sp||0,claimed:mine.claimed??null,p:(S.settings&&S.settings.name)||null,lb:lbData()})}
+    try{await PV.db.collection('drafts').doc(PV.uid).set({day:d,draft:dr,...keep,sp:mine.sp||0,claimed:mine.claimed??null,p:(S.settings&&S.settings.name)||null,lb:lbData(),roy:mine.roy??null,royPrev:mine.royPrev??null,rp:mine.rp||0,rclaimed:mine.rclaimed??null})}
     catch(e){PV.writing=false;return toast(e&&e.code==='invalid_argument'?'Ce partage ne permet pas d’inscrire une équipe.':'Envoi impossible pour le moment. Réessayez.')}
     PV.writing=false;
   }
@@ -1803,6 +1805,7 @@ function renderRank(){
     const season=(online?PV.docs.filter(x=>x.sp):[]).map(x=>({me:x.id===PV.uid,label:lbName({...x,me:x.id===PV.uid}),v:x.sp})).sort((a,b)=>b.v-a.v).slice(0,50);
     const y=pvpStandings(d-1).slice(0,3),t=pvpStandings(d).slice(0,10);
     body=`<section class="panel"><h2>Saison du Draft</h2>${st}${rankRows(season,x=>`${x.v} pts`)}<p class="note">Points de saison gagnés chaque jour selon la place au Draft de l’Oracle.</p></section>
+      <section class="panel"><h2>Saison de l’arène royale</h2>${rankRows((online?PV.docs.filter(x=>x.rp):[]).map(x=>({me:x.id===PV.uid,label:lbName({...x,me:x.id===PV.uid}),sub:`Ligue ${ROY_TIERS[tierOf(x.rp)].n}`,v:x.rp})).sort((a,b)=>b.v-a.v).slice(0,50),x=>`${x.v} pts`)}</section>
       <section class="panel"><h2>Podium d’hier</h2>${rankRows(y.map(e=>({me:e.me,label:entryName(e)+(e.bot?' (Ombre)':''),v:e.pts})),x=>`${x.v} pts`)}</section>
       <section class="panel"><h2>Aujourd’hui, en direct</h2>${rankRows(t.map(e=>({me:e.me,label:entryName(e)+(e.bot?' (Ombre)':''),sub:`${e.w} V · ${e.dr} N · ${e.l} D`,v:e.pts})),x=>`${x.v} pts`)}<button class="btn sm" data-act="tab" data-id="pvp" style="margin-top:8px">Aller au Draft</button></section>`;
   }
@@ -1811,6 +1814,116 @@ function renderRank(){
     body=`<section class="panel"><h2>Guildes</h2>${GO.status==='online'?'':'<p class="meta" style="margin:0 0 8px">Connexion aux guildes…</p>'}${rankRows(gl,x=>`Niv. ${x.lvl}${x.tr?` · ${x.tr} 🏆`:''}`)}<p class="note">Classement par niveau de guilde, puis par trophées de guerre et nombre de joueurs.</p></section>`;
   }
   return tabs+body;
+}
+
+
+/* ---------- Arène royale (PvP permanent) ----------
+   Chaque jour, chaque joueur inscrit un champion parmi ses héros. Tous les champions
+   s'affrontent dans une mêlée générale avec une tempête qui se resserre ; le classement
+   se fige à minuit. Les données vivent dans le document Draft du joueur (champ roy). */
+const ROY_FIELD=12,ROY_EDITS=3,ROY_BOTS=['Ombre écarlate','Ombre d’azur','Ombre de jade','Ombre d’ambre','Ombre d’onyx','Ombre d’argent','Ombre de nacre','Ombre de cendre','Ombre d’opale','Ombre de givre','Ombre d’airain'];
+const RY={stand:new Map()};
+const ROY_TIERS=[{n:'Bronze',min:0,c:'#d08b55'},{n:'Argent',min:40,c:'#cfd8e3'},{n:'Or',min:100,c:'#ffd35a'},{n:'Platine',min:200,c:'#7fe8d6'},{n:'Diamant',min:350,c:'#8fb8ff'},{n:'Maître',min:550,c:'#e58bff'}];
+const tierOf=rp=>{let t=0;ROY_TIERS.forEach((x,i)=>{if((rp||0)>=x.min)t=i});return t};
+const myRp=()=>{if(PV.status==='online'){const m=PV.docs.find(x=>x.id===PV.uid);return m&&m.rp||0}return S.rpLocal||0};
+const tierTag=t=>`<span class="tier" style="--tc:${ROY_TIERS[t].c}">${ROY_TIERS[t].n}</span>`;
+function myRoyTier(d){const L=royLocal();const c=d===L.day?L.sub:d===L.prevDay?L.prev:null;return c&&c.t!=null?c.t:tierOf(myRp())}
+function royLocal(){const d=dayIdx();S.roy=S.roy||{day:d,sub:null,edits:0};if(S.roy.day!==d)S.roy={day:d,sub:null,edits:0,prevDay:S.roy.sub?S.roy.day:(S.roy.prevDay===d-1?S.roy.prevDay:null),prev:S.roy.sub||(S.roy.prevDay===d-1?S.roy.prev:null)};return S.roy}
+function royCard(h){const s=stats(h);return{t:tierOf(myRp()),name:h.name,cls:h.cls,el:h.el,leg:h.leg||null,seed:h.seed,stars:h.stars,lvl:h.lvl,awk:h.awk||0,st:{hp:s.hp,atk:s.atk,def:s.def,spd:s.spd,crit:s.crit,cdmg:s.cdmg,pen:s.pen}}}
+const royValid=c=>c&&CLASSES[c.cls]&&c.st&&[c.st.hp,c.st.atk,c.st.def,c.st.spd].every(v=>Number.isFinite(v)&&v>0&&v<1e7);
+function royEntries(d,t){
+  const out=[];
+  if(PV.status==='online'){for(const doc of PV.docs){const c=doc.roy&&doc.roy.day===d?doc.roy.h:doc.royPrev&&doc.royPrev.day===d?doc.royPrev.h:null;if(royValid(c))out.push({id:doc.id,me:doc.id===PV.uid,p:typeof doc.p==='string'?doc.p.slice(0,20):'',c})}}
+  else{const L=royLocal(),c=L.day===d?L.sub:L.prevDay===d?L.prev:null;if(royValid(c))out.push({id:'me',me:true,c})}
+  return t==null?out:out.filter(e=>(e.c.t||0)===t);
+}
+function royName(e){return e.me?'Vous':e.bot?e.name:(e.p||PV.names[e.id]||'Joueur')}
+function royFight(d,t){
+  if(t==null)t=myRoyTier(d);
+  const E=royEntries(d,t),sig=d+'|'+t+'|'+E.map(e=>e.id+JSON.stringify(e.c.st)).join(';');
+  if(RY.stand.has(sig))return RY.stand.get(sig);
+  const res=withSeed(hash('roy'+sig),()=>{
+    const players=E.map(e=>({...e,name:e.c.name,cls:e.c.cls,el:e.c.el,hp:e.c.st.hp,max:e.c.st.hp,atk:e.c.st.atk,def:e.c.st.def,spd:e.c.st.spd,crit:e.c.st.crit||5,cdmg:e.c.st.cdmg||150,pen:e.c.st.pen||0,alive:true}));
+    const tb=1+.12*t,avg=players.length?{hp:players.reduce((t,u)=>t+u.max,0)/players.length,atk:players.reduce((t,u)=>t+u.atk,0)/players.length,def:players.reduce((t,u)=>t+u.def,0)/players.length,spd:11,crit:10,cdmg:160,pen:5}:{hp:300,atk:40,def:15,spd:11,crit:10,cdmg:160,pen:5};
+    const els=['eau','feu','vent','terre','lumiere','ombre'],bots=[];
+    for(let i=0;players.length+bots.length<ROY_FIELD;i++){const a=aiUnit(pick(NAMES),avg,(.42+R()*.3)*(players.length?1:tb));bots.push({id:'rb'+i,bot:true,name:ROY_BOTS[(d+i)%ROY_BOTS.length],cname:a.n,cls:a.cls,el:els[Math.floor(R()*6)],hp:a.hp,max:a.hp,atk:a.atk,def:a.def,spd:a.spd,crit:a.crit||5,cdmg:a.cdmg||150,pen:a.pen||0,alive:true,c:{name:a.n,cls:a.cls,stars:3,seed:Math.floor(R()*1e9)}})}
+    const U=[...players,...bots],out=[],log=[],live=()=>U.filter(u=>u.alive),me=U.find(u=>u.me);
+    U.forEach(u=>{u.kills=0});
+    const who=u=>`${u.c?u.c.name:u.name} (${royName(u)})`;
+    function strike(a,t,m){
+      if(!t.alive)return;const crit=R()<a.crit/100,em=elemMul(a.el,t.el);
+      const dmg=Math.max(1,Math.round(a.atk*m*em*(.9+R()*.2)*(crit?a.cdmg/100:1)-t.def*(1-a.pen/100)*.5));
+      t.hp=Math.max(0,t.hp-dmg);if(me&&(a===me||t===me))log.push({c:a===me?'hit-h':'hit-f',t:`${who(a)} frappe ${who(t)} : −${dmg}${crit?' (critique)':''}`});
+      if(t.hp===0){t.alive=false;a.kills++;out.push(t);log.push({c:t===me?'death':a===me?'kill':'sys',t:`${who(a)} élimine ${who(t)}. ${live().length} en lice.`})}
+    }
+    log.push({c:'sys',t:`${U.length} champions entrent dans l’arène royale. Il ne peut en rester qu’un.`});
+    for(let round=1;round<=40&&live().length>1;round++){
+      const order=live().map(u=>({u,k:u.spd+R()*4})).sort((a,b)=>b.k-a.k).map(o=>o.u);
+      for(const u of order){
+        if(!u.alive)continue;const others=live().filter(x=>x!==u);if(!others.length)break;
+        if(u.cls==='healer'&&u.hp<u.max*.5&&R()<.5){u.hp=Math.min(u.max,u.hp+Math.round(u.max*.2));continue}
+        if(u.cls==='mage'&&R()<.4){others.sort(()=>R()-.5).slice(0,2).forEach(t=>strike(u,t,.7));continue}
+        if(u.cls==='tank'&&R()<.25){u.hp=Math.min(u.max,u.hp+Math.round(u.max*.08));strike(u,pick(others),.8);continue}
+        const weak=others.slice().sort((a,b)=>a.hp-b.hp)[0];strike(u,R()<.3?weak:pick(others),u.cls==='archer'?1.1:u.cls==='warrior'?1.05:1);
+      }
+      if(round>=4&&live().length>1){const pct=.05*(round-3);log.push({c:'sys',t:`La tempête se resserre : −${Math.round(pct*100)} % des PV max pour tous.`});
+        live().forEach(u=>{u.hp=Math.max(0,u.hp-Math.ceil(u.max*pct));if(u.hp===0){u.alive=false;out.push(u);log.push({c:u===me?'death':'sys',t:`${who(u)} est emporté par la tempête.`})}})}
+    }
+    const rk=[...live().sort((a,b)=>b.hp/b.max-a.hp/a.max),...out.slice().reverse()];
+    if(rk[0])log.push({c:rk[0]===me?'win':'sys',t:`${who(rk[0])} est le dernier debout !`});
+    return{rank:rk.map(u=>({id:u.id,me:!!u.me,bot:!!u.bot,name:u.name,p:u.p,c:u.c,kills:u.kills})),log};
+  });
+  if(RY.stand.size>12)RY.stand.clear();RY.stand.set(sig,res);return res;
+}
+function royReward(rank,n,t=0){const top=rank/n,m=1+.25*t,r=rank===1?{gems:350,shards:25,tomes:1,rp:30}:rank<=3?{gems:220,shards:15,rp:20}:top<=.5?{gems:120,shards:6,rp:10}:{gems:50,shards:0,rp:t>=2?-8:4};
+  return{gems:Math.round(r.gems*m),shards:Math.round(r.shards*m),tomes:r.tomes?r.tomes+(t>=3?1:0):0,rp:r.rp}}
+async function royRegister(id){
+  const h=heroById(id);if(!h||busy)return;const L=royLocal(),d=L.day;
+  if(L.edits>=ROY_EDITS)return toast('Plus de changements de champion possibles aujourd’hui.');
+  const c=royCard(h);
+  if(PV.status==='online'){
+    if(!PV.canWrite)return toast('Inscription impossible sur ce partage.');
+    if(PV.writing)return;PV.writing=true;
+    const mine=PV.docs.find(x=>x.id===PV.uid);
+    const keep=mine&&mine.roy&&mine.roy.day!==d?{royPrev:mine.roy}:{};
+    try{if(mine)await PV.db.collection('drafts').doc(PV.uid).update({roy:{day:d,h:c},...keep,p:(S.settings&&S.settings.name)||null});
+        else await PV.db.collection('drafts').doc(PV.uid).set({roy:{day:d,h:c},p:(S.settings&&S.settings.name)||null,sp:0,day:null,draft:null,lb:lbData()})}
+    catch(e){PV.writing=false;return toast('Inscription impossible pour le moment. Réessayez.')}
+    PV.writing=false;
+  }
+  L.sub=c;L.edits++;track('royale');save();render();toast(`${h.name} entre dans l’arène royale !`);
+}
+async function royClaim(){
+  const d=dayIdx()-1;if(S.royClaimed===d)return;
+  const t=myRoyTier(d),F=royFight(d,t),i=F.rank.findIndex(e=>e.me);if(i<0)return;
+  const r=royReward(i+1,F.rank.length,t);S.gems+=r.gems;S.shards+=r.shards;giveTomes(r.tomes||0);S.royClaimed=d;
+  const before=myRp(),after=Math.max(0,before+r.rp);S.rpLocal=after;
+  if(PV.status==='online'&&PV.canWrite){const mine=PV.docs.find(x=>x.id===PV.uid);if(mine&&mine.rclaimed!==d){try{await PV.db.collection('drafts').doc(PV.uid).update({rp:after,rclaimed:d})}catch(e){}}}
+  const nt=tierOf(after);
+  save();render();toast(`Arène royale d’hier : ${i+1}ᵉ place en ligue ${ROY_TIERS[t].n}, ${fmtR(r)}, ${r.rp>=0?'+':''}${r.rp} points d’arène.${nt>t?` Promotion en ligue ${ROY_TIERS[nt].n} !`:nt<t?` Relégation en ligue ${ROY_TIERS[nt].n}.`:''}`);
+}
+let royShowLog=false;
+function renderRoyale(){
+  const L=royLocal(),d=L.day,left=dayDate(d+1).getTime()-Date.now(),T=myRoyTier(d),F=royFight(d,T),mi=F.rank.findIndex(e=>e.me),rp=myRp(),ct=tierOf(rp),nx=ROY_TIERS[ct+1];
+  const nPlayers=F.rank.filter(e=>!e.bot).length;
+  const st=PV.status==='online'?`<span class="good">En ligne · ${nPlayers} champion${nPlayers>1?'s':''} inscrit${nPlayers>1?'s':''} dans votre ligue</span>`:PV.status==='offline'?'<span class="bad">Hors ligne : vous affrontez uniquement les Ombres.</span>':'Connexion à l’arène…';
+  const yT=myRoyTier(d-1),yF=royFight(d-1,yT),yi=yF.rank.findIndex(e=>e.me);
+  const yCard=yi>=0?`<section class="panel"><h2>Arène d’hier</h2><div><b>${yi+1}ᵉ sur ${yF.rank.length}</b> · ${yF.rank[yi].kills} élimination${yF.rank[yi].kills>1?'s':''}</div><div class="meta">Ligue ${ROY_TIERS[yT].n} · ${fmtR(royReward(yi+1,yF.rank.length,yT))} · ${royReward(yi+1,yF.rank.length,yT).rp>=0?'+':''}${royReward(yi+1,yF.rank.length,yT).rp} points d’arène</div><div style="margin-top:8px">${S.royClaimed===d-1?'<span class="good">Récompense réclamée</span>':'<button class="btn prime" data-act="royclaim">Réclamer</button>'}</div></section>`:'';
+  const cand=S.heroes.filter(h=>h.hp>0).sort((a,b)=>{const x=stats(a),y=stats(b);return(y.atk*2+y.hp/4+y.def)-(x.atk*2+x.hp/4+x.def)}).slice(0,12);
+  const pickList=cand.map(h=>{const s=stats(h),on=L.sub&&L.sub.name===h.name&&L.sub.lvl===h.lvl&&L.sub.cls===h.cls;return`<button class="bh pcard r${h.stars}${on?' sel':''}" data-act="royreg" data-id="${h.id}" ${busy||L.edits>=ROY_EDITS?'disabled':''}><div class="ava">${portrait(h)}</div><span class="bn">${h.name}</span><span class="fmeta">${elChip(h.el)}</span><span class="fmeta">${CLASSES[h.cls].n} · niv. ${h.lvl}</span><span class="fmeta">ATQ ${s.atk} · PV ${s.hp}</span></button>`}).join('');
+  const mine=L.sub?`<div class="mrow"><div class="ava">${portrait(L.sub)}</div><div class="mi"><b>${esc(L.sub.name)}</b><span class="role">${CLASSES[L.sub.cls].n} · niv. ${L.sub.lvl}</span><div class="meta">PV ${L.sub.st.hp} · ATQ ${L.sub.st.atk} · DÉF ${L.sub.st.def} · VIT ${L.sub.st.spd}</div></div></div>`:'<p class="empty" style="padding:4px 0">Aucun champion inscrit aujourd’hui.</p>';
+  const rows=F.rank.slice(0,ROY_FIELD+40).map((e,i)=>`<div class="srow${e.me?' mine':''}"><span class="rkn${i<3?' top'+(i+1):''}">${i+1}</span><div class="mi"><b>${esc(royName(e))}</b>${e.bot?' <span class="role">Ombre</span>':''}<div class="meta">${esc(e.c?e.c.name:'')} · ${CLASSES[e.c&&e.c.cls]?CLASSES[e.c.cls].n:''}</div></div><span class="rkv">${e.kills} élim.</span></div>`).join('');
+  return`<section class="panel"><h2>Arène royale</h2>
+    <p class="hint" style="margin-bottom:8px">Chaque jour, inscrivez <b>un champion parmi vos héros</b>, avec son niveau et son équipement. Tous les champions inscrits, complétés par des Ombres, s’affrontent dans une mêlée générale : une tempête se resserre à chaque tour, et le dernier debout l’emporte. Le classement se fige à minuit.</p>
+    <div class="league"><div>${tierTag(ct)}<b>${rp} points d’arène</b></div><div class="meta">${nx?`Ligue ${nx.n} à ${nx.min} points`:'Ligue la plus haute'}</div><div class="bar"><i style="width:${nx?Math.min(100,(rp-ROY_TIERS[ct].min)/(nx.min-ROY_TIERS[ct].min)*100):100}%;background:${ROY_TIERS[ct].c}"></i></div></div>
+    <p class="note" style="margin:6px 0">Vous n’affrontez que les champions de votre ligue. Ligues : ${ROY_TIERS.map(x=>`${x.n} ${x.min}`).join(' · ')}. À partir de l’Or, finir dans la moitié basse fait perdre 8 points. Les récompenses augmentent de 25 % par ligue.</p>
+    <div class="meta">${st} · fin dans ${fmtLeft(left)} · changements ${L.edits}/${ROY_EDITS}</div></section>
+    ${yCard}
+    <section class="panel"><h2>Votre champion</h2>${mine}<p class="note">Les statistiques sont figées au moment de l’inscription : réinscrivez-le après l’avoir renforcé.</p>
+      <div class="bench">${pickList||'<p class="empty">Aucun héros en état de combattre.</p>'}</div></section>
+    <section class="panel"><h2>Ligue ${ROY_TIERS[T].n} · aujourd’hui${mi>=0?` · vous êtes ${mi+1}ᵉ`:''}</h2>${F.rank.length?`<div class="stand">${rows}</div>`:'<p class="empty">Personne n’est encore inscrit.</p>'}
+      ${mi>=0?`<button class="btn sm" data-act="roylog" style="margin-top:8px">${royShowLog?'Masquer le récit':'Voir le récit du combat'}</button>${royShowLog?`<div class="log" style="margin-top:8px;max-height:320px">${F.log.map(x=>`<p class="${x.c}">${esc(x.t)}</p>`).join('')}</div>`:''}`:''}
+      <p class="note">Récompenses en ligue ${ROY_TIERS[T].n} (à réclamer le lendemain) : 1ʳᵉ place ${fmtR(royReward(1,10,T))} · 2ᵉ et 3ᵉ ${fmtR(royReward(2,10,T))} · première moitié ${fmtR(royReward(4,10,T))} · autres ${fmtR(royReward(9,10,T))}. Plus des points d’arène pour le classement de saison.</p></section>`;
 }
 
 /* ---------- Chat global ---------- */
@@ -3016,8 +3129,13 @@ function renderGuild(){
     ${body}`;
 }
 
+let psub='draft';
 function renderPvp(){
   initPvp();
+  const tabs=`<div class="chips">${[['draft','Draft de l’Oracle'],['royale','Arène royale']].map(([k,l])=>`<button class="chipbtn" data-act="psub" data-id="${k}" aria-pressed="${psub===k}">${l}</button>`).join('')}</div>`;
+  return tabs+(psub==='royale'?renderRoyale():renderDraft());
+}
+function renderDraft(){
   const L=pvpLocal(),d=L.day,pool=pvpPool(d),law=pvpLaw(d),w=L.work,myHand=pvpHand(d,myPvpKey());
   if(w.p.some(i=>!myHand.includes(i))){w.p=w.p.filter(i=>myHand.includes(i));w.b=w.b.filter(i=>w.p.includes(i))}
   const cost=pvpCost(d,w),left=dayDate(d+1).getTime()-Date.now();
@@ -3198,6 +3316,10 @@ document.addEventListener('click',e=>{
     case 'btgt':bTarget(+id);break;
     case 'bgo':{const w=bWait();if(w)bAct({i:w.sel});break}
     case 'bauto':bAuto();break;
+    case 'psub':psub=id;render();break;
+    case 'royreg':royRegister(+id);break;
+    case 'royclaim':royClaim();break;
+    case 'roylog':royShowLog=!royShowLog;render();break;
     case 'rsub':rsub=id;render();break;
     case 'revive':revive(+id);break;
     case 'dupfuse':dupFuse(+id);break;
