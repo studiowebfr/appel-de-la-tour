@@ -1812,7 +1812,7 @@ async function initPvp(){
   PV.unsub=PV.db.collection('drafts').onSnapshot(snap=>{
     if(!snap.metadata.fromCache)clearTimeout(timer);
     PV.status='online';PV.docs=snap.docs.map(x=>({id:x.id,...x.data()}));
-    pvpNames();lbSync();rtaSnap();if((tab==='pvp'||tab==='rank')&&!busy)render();
+    pvpNames();lbSync();rtaSnap();deadCheck();if((tab==='pvp'||tab==='rank')&&!busy)render();
   },()=>{clearTimeout(timer);PV.status='offline';if(tab==='pvp'&&!busy)render()});
 }
 async function pvpNames(){
@@ -2335,7 +2335,7 @@ async function cloudInit(){
   cloudPush();settingsRefresh();
 }
 function adoptSave(obj,msg){
-  S=obj;migrate();CLOUD.status=CLOUD.ref?'on':CLOUD.status;
+  S=obj;migrate();const nd=enforceDead();if(nd)msg=(msg?msg+' ':'')+`${nd} héros déjà tombé${nd>1?'s':''} sur cette partie ${nd>1?'restent':'reste'} au Mémorial.`;CLOUD.status=CLOUD.ref?'on':CLOUD.status;
   tab='home';lastBattle=null;busy=false;sheetId=null;selHero=null;fuseTarget=null;lastPull=null;
   try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}
   closeModal();render();if(msg)toast(msg);cloudPush();
@@ -2634,12 +2634,49 @@ function ascend(id){
   withRatio(h,()=>{h.stars++});h.asc=true;track('asc');
   save();render();toast(`Ascension réussie : ${h.name} passe à ${h.stars}★ !`);
 }
+
+/* ---------- Registre des morts : la mort reste définitive même en important une ancienne sauvegarde ---------- */
+const DEADK='appel-tour-dead';let deadPushed='';
+function deadLocal(){try{const a=JSON.parse(localStorage.getItem(DEADK)||'[]');return Array.isArray(a)?a:[]}catch(e){return[]}}
+function deadStore(a){try{localStorage.setItem(DEADK,JSON.stringify(a.slice(-1500)))}catch(e){}}
+function ensureSid(){
+  if(S.sid)return;
+  const all=[...(S.heroes||[]),...(S.fallen||[]).map(f=>f.hero).filter(Boolean)].filter(h=>h&&h.id!=null&&h.id<=6).sort((a,b)=>a.id-b.id);
+  S.sid=all.length?'L'+Math.abs(hash(all.map(h=>h.id+'-'+h.seed).join('|'))).toString(36):'N'+Math.floor(Math.random()*1e12).toString(36);
+}
+const heroKey=h=>S.sid+':'+h.id;
+function deadAdd(keys){if(!keys.length)return;const a=deadLocal();keys.forEach(k=>{if(!a.includes(k))a.push(k)});deadStore(a);deadPush()}
+function deadMine(){const p=S.sid+':';return deadLocal().filter(k=>k.startsWith(p))}
+async function deadPush(){
+  if(!S||PV.status!=='online'||!PV.canWrite||!PV.uid||!PV.db)return;
+  const list=deadMine().slice(-300),sig=JSON.stringify(list);if(!list.length||sig===deadPushed)return;deadPushed=sig;
+  const ref=PV.db.collection('drafts').doc(PV.uid),mine=PV.docs.find(x=>x.id===PV.uid);
+  try{if(mine)await ref.update({dead:list});else await ref.set({dead:list,sp:0,day:null,draft:null,p:(S.settings&&S.settings.name)||null})}catch(e){deadPushed=''}
+}
+function enforceDead(){
+  if(!S||!Array.isArray(S.heroes))return 0;ensureSid();
+  const p=S.sid+':',keys=new Set(deadLocal().filter(k=>k.startsWith(p)));
+  if(PV&&PV.status==='online')PV.docs.forEach(d=>{if(Array.isArray(d.dead))d.dead.forEach(k=>{if(typeof k==='string'&&k.startsWith(p))keys.add(k)})});
+  (S.fallen||[]).forEach(f=>{if(f.hero&&f.hero.id!=null)keys.add(heroKey(f.hero))});
+  const gone=S.heroes.filter(h=>keys.has(heroKey(h)));
+  if(gone.length){
+    const ids=gone.map(h=>h.id);
+    gone.forEach(h=>{if(!(S.fallen||[]).some(f=>f.hero&&f.hero.id===h.id)){S.fallen=S.fallen||[];S.fallen.unshift({name:h.name,cls:h.cls,stars:h.stars,lvl:h.lvl,awk:h.awk,leg:h.leg||null,seed:h.seed,el:h.el,where:'Mort déjà enregistrée',killer:'le destin',at:Date.now(),hero:JSON.parse(JSON.stringify(h))})}});
+    ids.forEach(id=>{unequipAll(id);removeFromTeam(id)});S.heroes=S.heroes.filter(h=>!ids.includes(h.id));
+    if(ids.includes(sheetId)){sheetId=null;pickSlot=null}if(ids.includes(selHero))selHero=null;if(ids.includes(fuseTarget))fuseTarget=null;
+  }
+  const a=deadLocal(),n0=a.length;keys.forEach(k=>{if(!a.includes(k))a.push(k)});if(a.length!==n0)deadStore(a);
+  return gone.length;
+}
+function deadCheck(){const n=enforceDead();deadPush();if(n){save();if(!busy)render();toast(`${n} héros déjà tombé${n>1?'s':''} ${n>1?'ont':'a'} rejoint le Mémorial : la mort est définitive, même en important une sauvegarde.`)}}
+
 function casualties(res,sum,where){
   res.U.filter(u=>u.side==='h').forEach(u=>{
     const h=heroById(u.id);h.hp=Math.min(stats(h).hp,Math.round(u.hp/(u.hpMul||1)));
     if(!u.alive){sum.fallen.push(h.name);S.fallen.unshift({name:h.name,cls:h.cls,stars:h.stars,lvl:h.lvl,awk:h.awk,leg:h.leg||null,seed:h.seed,el:h.el,where,killer:u.killer,at:Date.now(),hero:JSON.parse(JSON.stringify(h))})}
   });
   const dead=res.U.filter(u=>u.side==='h'&&!u.alive).map(u=>u.id);
+  ensureSid();deadAdd(dead.map(id=>S.sid+':'+id));
   dead.forEach(id=>{unequipAll(id);removeFromTeam(id)});
   S.heroes=S.heroes.filter(h=>!dead.includes(h.id));
   if(dead.includes(fuseTarget))fuseTarget=null;
@@ -3788,7 +3825,7 @@ document.addEventListener('click',e=>{
 });
 
 S=load();
-if(!S||!Array.isArray(S.heroes))newGame();else{migrate();save()}
+if(!S||!Array.isArray(S.heroes))newGame();else{migrate();enforceDead();save()}
 render();
 if(!S.introSeen)showIntro(0);
 cloudInit();
