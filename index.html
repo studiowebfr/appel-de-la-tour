@@ -578,6 +578,8 @@ h2{text-transform:uppercase;letter-spacing:.12em;color:#8fe3ff;text-shadow:0 0 8
 
 img.art{display:block;width:100%;height:100%;object-fit:cover;object-position:50% 12%;max-width:100%}
 img.art.foe{object-position:50% 50%}
+.skhead{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:2px}
+.skhead b{min-width:0}
 </style>
 
 <div class="app">
@@ -875,7 +877,7 @@ function newGame(){
   S.inv.push(makeItem('weapon',2,1),makeItem('ring',2,1));
   S.foes=genFoes(1);save();
 }
-function ensureDun(){DUNGEONS.forEach(d=>{if(!S.dun[d.k])S.dun[d.k]=1;if(!S.dunSel[d.k])S.dunSel[d.k]=1});if(S.shards==null)S.shards=0;if(!Array.isArray(S.train))S.train=[];if(!S.trainSlots)S.trainSlots=3;if(!S.afkT)S.afkT=Date.now();S.et=S.et||{};S.eslots=S.eslots||{};Object.keys(ELEM).forEach(k=>{if(!S.et[k])S.et[k]={floor:1,best:0,foes:null};if(!S.eslots[k])S.eslots[k]=[null,null,null,null,null,null]});
+function ensureDun(){DUNGEONS.forEach(d=>{if(!S.dun[d.k])S.dun[d.k]=1;if(!S.dunSel[d.k])S.dunSel[d.k]=1});if(S.shards==null)S.shards=0;if(S.tomes==null){S.tomes=Math.floor((S.best||0)/10)}if(!S.tomesET){S.tomesET=1;S.tomes+=Object.values(S.et||{}).reduce((t,x)=>t+Math.floor(((x&&x.best)||0)/10),0)}if(!Array.isArray(S.train))S.train=[];if(!S.trainSlots)S.trainSlots=3;if(!S.afkT)S.afkT=Date.now();S.et=S.et||{};S.eslots=S.eslots||{};Object.keys(ELEM).forEach(k=>{if(!S.et[k])S.et[k]={floor:1,best:0,foes:null};if(!S.eslots[k])S.eslots[k]=[null,null,null,null,null,null]});
   if((S.v||1)<2){S.v=2;if(S.floor>TOWER_MAX+1)S.floor=TOWER_MAX+1;S.best=Math.min(S.best||0,TOWER_MAX);S.foes=S.floor>TOWER_MAX?[]:genFoes(S.floor);Object.values(S.et).forEach(t=>{if(t.floor>TOWER_MAX+1)t.floor=TOWER_MAX+1;t.best=Math.min(t.best,TOWER_MAX);t.foes=null});S.dunFoes={}}}
 function migrate(){
   (S.heroes||[]).forEach(h=>{if(!h.leg&&!h.trait)h.trait=TRAITS[(h.seed||h.id)%TRAITS.length].k});(S.inv||[]).forEach(it=>{if(!it.set)it.set=Object.keys(SETS)[it.id%5]});
@@ -965,6 +967,34 @@ const LSK={
   morgane:{2:{n:'Pluie d’étoiles',cd:3,tg:'n',aoe:1.6,fx:['defDown',50,2],d:'Inflige 160 % de l’ATQ à tous les ennemis. 50 % de chance de réduire leur DÉF pendant 2 tours.'}},
   ilyas:{0:{n:'Double trait',tg:'e',m:1,twin:1,d:'Tire deux flèches de 100 % de l’ATQ : la seconde vise l’ennemi le plus affaibli.'}}
 };
+/* ---------- Niveaux de compétences (Tomes de maîtrise) ---------- */
+const SK_MAX=5,SK_COST=[0,0,1,1,2,2];
+const skLv=(h,i)=>Math.min(SK_MAX,Math.max(1,((h.skl||[])[i])||1));
+function skBonus(s,lv){
+  let dm=1,fx=0,cd=0;
+  if(lv>=2)dm+=.10;
+  if(lv>=3){if(s.fx)fx+=10;else dm+=.10}
+  if(lv>=4)dm+=.15;
+  if(lv>=5){if(s.cd)cd=1;else dm+=.15}
+  return{dm,fx,cd};
+}
+function skillAt(s,lv){
+  if(!s||lv<=1)return s;
+  const b=skBonus(s,lv),o={...s,lv};
+  for(const k of['m','aoe','heal','bless'])if(o[k])o[k]=o[k]*b.dm;
+  if(o.rain)o.rm=b.dm;
+  if(o.fx&&b.fx)o.fx=[o.fx[0],Math.min(100,o.fx[1]+b.fx),o.fx[2]];
+  if(o.cd&&b.cd)o.cd=Math.max(1,o.cd-b.cd);
+  return o;
+}
+const skStep=(s,lv)=>lv===2?'+10 % de dégâts et de soin':lv===3?(s.fx?'+10 % de chance d’effet':'+10 % de dégâts et de soin'):lv===4?'+15 % de dégâts et de soin':lv===5?(s.cd?'Recharge réduite d’1 tour':'+15 % de dégâts et de soin'):'';
+function skillUp(id,i){
+  const h=heroById(id);if(!h)return;const l=skLv(h,i);if(l>=SK_MAX)return;const c=SK_COST[l+1];
+  if((S.tomes||0)<c)return toast(`Il faut ${c} Tome${c>1?'s':''} de maîtrise.`);
+  S.tomes-=c;h.skl=[skLv(h,0),skLv(h,1),skLv(h,2)];h.skl[i]=l+1;sfx('ult');save();render();
+  toast(`${skillsOf(h)[i].n} passe au niveau ${l+1} : ${skStep(skillsOf(h)[i],l+1)}.`);
+}
+function giveTomes(n,why){if(!n)return;S.tomes=(S.tomes||0)+n;return n}
 function skillsOf(h){const b=SK[h.cls];if(!b)return[];const o=(h.leg&&LSK[h.leg])||{};return b.map((s,i)=>o[i]||s)}
 const LEADN={hpp:'PV',atkp:'ATQ',defp:'DÉF',crit:'taux critique',cdmg:'dégâts critiques',spd:'VIT',acc:'Précision',res:'Résistance'};
 const LEAD_LEG={valdrik:{k:'hpp',v:25},seren:{k:'atkp',v:22},kaelen:{k:'cdmg',v:30},ilyas:{k:'spd',v:15},morgane:{k:'crit',v:15},aelis:{k:'res',v:35}};
@@ -978,7 +1008,7 @@ function battleNew(heroes,foes,slots,maxR,opt){
   const rowIn=(sl,id)=>{const i=sl.indexOf(id);return i>=3?'back':'front'};
   const U=[],names=labelFoes(foes);
   const mk=(h,side,sl)=>{const s=stats(h),row=rowIn(sl,h.id);return{side,id:h.id,name:h.name,cls:h.cls,leg:h.leg||null,seed:h.seed,stars:h.stars,hp:h.hp,max:s.hp,atk:s.atk,def:s.def,spd:s.spd,crit:s.crit,cdmg:s.cdmg,pen:s.pen,acc:s.acc||0,res:s.res==null?15:s.res,
-    alive:h.hp>0,turn:0,killer:null,el:h.el,row,rowMul:(row==='back'&&MELEE(h.cls))?.7:1,sk:skillsOf(h),cd:[0,0,0],fx:[],atb:0,lead:sl[0]===h.id?leaderOf(h):null}};
+    alive:h.hp>0,turn:0,killer:null,el:h.el,row,rowMul:(row==='back'&&MELEE(h.cls))?.7:1,sk:skillsOf(h).map((x,i)=>h.pvpMerc?x:skillAt(x,skLv(h,i))),cd:[0,0,0],fx:[],atb:0,lead:sl[0]===h.id?leaderOf(h):null}};
   heroes.forEach(h=>U.push(mk(h,'h',slots)));
   if(opt.foeHeroes){foes.forEach(h=>{const u=mk(h,'f',opt.foeSlots);u.pvp=true;U.push(u)});applySyn(U.filter(u=>u.side==='f'),teamSyn(foes))}
   else foes.forEach((f,i)=>{const lv=f.lv||0;U.push({side:'f',name:names[i],cls:'foe',hp:f.hp,max:f.hp,atk:f.atk,def:f.def,spd:f.spd,alive:true,turn:0,boss:!!f.boss,el:f.el,crit:f.crit||5,cdmg:f.cdmg||150,pen:f.pen!=null?f.pen:(f.boss?10:0),
@@ -1051,7 +1081,7 @@ function battleNew(heroes,foes,slots,maxR,opt){
       if(s.twin){const l=foesOf(u);if(l.length)hit(u,lowest(l),s.m,'décoche sur')}
     }
     if(s.aoe)foesOf(u).forEach(x=>hit(u,x,s.aoe*(u.aoeMul||1),'frappe',0,s.fx));
-    if(s.rain)for(let k=0;k<s.rain;k++){const l=foesOf(u);if(!l.length)break;hit(u,pick(l),.8,'transperce',20)}
+    if(s.rain)for(let k=0;k<s.rain;k++){const l=foesOf(u);if(!l.length)break;hit(u,pick(l),.8*(s.rm||1),'transperce',20)}
     if(s.team)allies.forEach(a=>addFx(u,a,s.team[0],100,s.team[1]));
     if(s.self)addFx(u,u,s.self[0],100,s.self[1]);
     if(s.heal){if(!t||!t.alive||t.side!==u.side)t=lowest(allies);healU(u,t,Math.round(u.atk*s.heal*(u.healMul||1)*(.9+R()*.2)))}
@@ -1134,6 +1164,7 @@ function climbE(){
   startBattle(party,eFoes(el),slots,sum,res=>{sum.win=res.win;
   casualties(res,sum,label);
   if(res.win){
+    if(f%10===0)sum.tomes=giveTomes(1);
     const r=eReward(f);r.shards*=shardMul();r.gold*=goldMul();sum.gems=r.gems;sum.gold=r.gold;sum.shards=r.shards;
     S.gems+=r.gems;S.gold+=r.gold;S.shards+=r.shards;
     grantXp(party,40+f*8,sum);track('etower');
@@ -1632,7 +1663,7 @@ function pvpStandings(d){
   T.sort((x,y)=>y.pts-x.pts||y.w-x.w||hash(x.id)-hash(y.id));
   if(PV.stand.size>20)PV.stand.clear();PV.stand.set(sig,T);return T;
 }
-function pvpReward(rank,n){const top=rank/n;return rank===1?{gems:400,shards:30,sp:100}:rank<=3?{gems:250,shards:20,sp:60}:top<=.25?{gems:150,shards:10,sp:40}:top<=.5?{gems:80,shards:5,sp:20}:{gems:40,shards:0,sp:10}}
+function pvpReward(rank,n){const top=rank/n;return rank===1?{gems:400,shards:30,sp:100,tomes:3}:rank<=3?{gems:250,shards:20,sp:60}:top<=.25?{gems:150,shards:10,sp:40}:top<=.5?{gems:80,shards:5,sp:20}:{gems:40,shards:0,sp:10}}
 function entryName(e){return e.me?'Vous':e.bot?e.name:(e.p||PV.names[e.id]||'Joueur')}
 
 async function initPvp(){
@@ -1687,9 +1718,9 @@ async function pvpSubmit(){
 async function pvpClaim(){
   const d=dayIdx()-1;if(S.pvpClaimed===d)return;
   const T=pvpStandings(d),me=T.findIndex(e=>e.me);if(me<0)return;
-  const r=pvpReward(me+1,T.length);S.gems+=r.gems;S.shards+=r.shards;S.pvpClaimed=d;S.pvpSp=(S.pvpSp||0)+r.sp;save();
+  const r=pvpReward(me+1,T.length);S.gems+=r.gems;S.shards+=r.shards;giveTomes(r.tomes||0);S.pvpClaimed=d;S.pvpSp=(S.pvpSp||0)+r.sp;save();
   if(PV.status==='online'&&PV.canWrite){const mine=PV.docs.find(x=>x.id===PV.uid);if(mine&&mine.claimed!==d){try{await PV.db.collection('drafts').doc(PV.uid).update({sp:(mine.sp||0)+r.sp,claimed:d})}catch(e){}}}
-  render();toast(`Récompense d’hier : ${me+1}ᵉ place, +${r.gems} cristaux${r.shards?`, +${r.shards} éclats`:''}, +${r.sp} points de saison.`);
+  render();toast(`Récompense d’hier : ${me+1}ᵉ place, +${r.gems} cristaux${r.shards?`, +${r.shards} éclats`:''}, +${r.sp} points de saison${r.tomes?`, +${r.tomes} Tomes de maîtrise`:''}.`);
 }
 function pvpWatch(id){
   const d=dayIdx(),E=pvpEntries(d),A=E.find(e=>e.me),B=E.find(e=>e.id===id);if(!A||!B||busy)return;
@@ -1908,7 +1939,7 @@ const MISSIONS=[
   {k:'etower',n:'Gagner un combat dans une tour élémentaire',t:1,need:()=>S.best>=ET_UNLOCK},
   {k:'equip',n:'Équiper une pièce sur un héros',t:1}
 ];
-const DM_RW={gems:40,gold:400},DM_CHEST={gems:150,gold:1000,shards:15};
+const DM_RW={gems:40,gold:400},DM_CHEST={gems:150,gold:1000,shards:15,tomes:2};
 function dailyMissions(){
   const d=dayIdx();
   if(!S.dm||S.dm.day!==d){
@@ -1923,7 +1954,7 @@ function claimMission(k){
 }
 function claimChest(){
   const dm=dailyMissions();if(dm.chest||!dm.list.every(k=>dm.claimed[k]))return;
-  dm.chest=true;S.gems+=DM_CHEST.gems;S.gold+=DM_CHEST.gold;S.shards+=DM_CHEST.shards;sfx('win');save();render();toast(`Coffre du jour : +${DM_CHEST.gems} cristaux, +${DM_CHEST.gold} or, +${DM_CHEST.shards} éclats.`);
+  dm.chest=true;S.gems+=DM_CHEST.gems;S.gold+=DM_CHEST.gold;S.shards+=DM_CHEST.shards;giveTomes(DM_CHEST.tomes);sfx('win');save();render();toast(`Coffre du jour : +${DM_CHEST.gems} cristaux, +${DM_CHEST.gold} or, +${DM_CHEST.shards} éclats, +${DM_CHEST.tomes} Tomes de maîtrise.`);
 }
 const GUIDE=[
   {n:'Invoquer 10 héros au portail',go:'summon',chk:()=>S.pulls>=10,rw:{gems:200}},
@@ -1932,16 +1963,16 @@ const GUIDE=[
   {n:'Équiper une pièce sur un héros',go:'heroes',chk:()=>S.inv.some(i=>i.by!=null),rw:{gold:500}},
   {n:'Faire un donjon',go:'dungeon',chk:()=>(S.st&&S.st.dungeon)>0,rw:{gems:100,shards:10}},
   {n:'Améliorer une pièce jusqu’à +3',go:'bag',chk:()=>S.inv.some(i=>i.plus>=3),rw:{gold:800}},
-  {n:'Gagner l’étage 10 (premier boss)',go:'tower',chk:()=>S.best>=10,rw:{gems:300}},
+  {n:'Gagner l’étage 10 (premier boss)',go:'tower',chk:()=>S.best>=10,rw:{gems:300,tomes:2}},
   {n:'Fonder une guilde',go:'guild',chk:()=>!!S.guild,rw:{gems:150}},
-  {n:'Inscrire une équipe au Draft de l’Oracle',go:'pvp',chk:()=>(S.st&&S.st.draft)>0,rw:{gems:150}},
+  {n:'Inscrire une équipe au Draft de l’Oracle',go:'pvp',chk:()=>(S.st&&S.st.draft)>0,rw:{gems:150,tomes:1}},
   {n:'Placer un héros à l’entraînement',go:'train',chk:()=>(S.st&&S.st.train)>0||S.train.length>0,rw:{gold:1000}},
-  {n:'Gagner l’étage 25',go:'tower',chk:()=>S.best>=25,rw:{gems:300,shards:30}}
+  {n:'Gagner l’étage 25',go:'tower',chk:()=>S.best>=25,rw:{gems:300,shards:30,tomes:2}}
 ];
 const guideIdx=()=>S.guide||0;
 function claimGuide(){
   const i=guideIdx(),g=GUIDE[i];if(!g||!g.chk())return;
-  S.gems+=g.rw.gems||0;S.gold+=g.rw.gold||0;S.shards+=g.rw.shards||0;S.guide=i+1;sfx('coin');save();render();toast(`Objectif atteint : ${fmtR(g.rw)}.`);
+  S.gems+=g.rw.gems||0;S.gold+=g.rw.gold||0;S.shards+=g.rw.shards||0;giveTomes(g.rw.tomes||0);S.guide=i+1;sfx('coin');save();render();toast(`Objectif atteint : ${fmtR(g.rw)}.`);
 }
 const ACH=[
   ...[10,25,50,100,150,200,250].map((f,i)=>({id:'f'+f,n:`Atteindre l’étage ${f}`,chk:()=>S.best>=f,rw:{gems:[100,150,200,300,400,500,1000][i]}})),
@@ -2119,7 +2150,7 @@ function climb(){
   startBattle(party,S.foes,S.slots,sum,res=>{sum.win=res.win;
   casualties(res,sum,`Étage ${f}`);
   if(res.win){
-    const boss=f%10===0;
+    const boss=f%10===0;if(boss)sum.tomes=giveTomes(1);
     sum.gems=20+f*2+(boss?100:0);sum.gold=(50+f*12+(boss?150:0))*goldMul();
     S.gems+=sum.gems;S.gold+=sum.gold;
     grantXp(party,20+f*6,sum);track('climb');if(f%10===0&&!(S.storyRead&&S.storyRead[Math.min(STORY.length-1,f/10)]))S.storyPending=Math.min(STORY.length-1,f/10);
@@ -2531,6 +2562,7 @@ function renderBattle(){
     ${s.note?`<div class="muted">${s.note}</div>`:''}
     ${s.done?`<div class="good" style="font-size:16px"><b>${s.done}</b></div>`:''}
     ${s.shards?`<div class="good"><b>+${s.shards} éclats d’étoile</b> (total ${S.shards})</div>`:''}
+    ${s.tomes?`<div class="good"><b>+${s.tomes} Tome de maîtrise</b> (total ${S.tomes}) · palier de 10 étages</div>`:''}
     ${s.unlock?`<div class="muted">Niveau ${s.unlock} débloqué.</div>`:''}
     ${s.levels.length?`<div class="muted">Progression : ${s.levels.join(', ')}</div>`:''}
     ${s.fallen.length?`<div class="fall">Tombés : ${s.fallen.join(', ')}. Leurs noms sont gravés au Mémorial et leur équipement retourne au sac.</div>`:''}
@@ -2626,7 +2658,7 @@ function renderSheet(){
       <div style="display:grid;gap:5px;min-width:0"><div class="hname" style="font-size:22px">${h.name}${awkTag(h)}</div>${L?`<div class="title">${L.title}</div>`:''}${starsHtml(h.stars)}
       <div class="meta">${elChip(h.el)} ${CLASSES[h.cls].n} · Niv. ${h.lvl}</div>${hpBar(h.hp,s.hp)}</div></div>
     ${L?`<div style="margin-top:10px">${skillBox(L)}</div>`:''}${traitOf(h)?`<div class="trait" style="margin-top:8px">Trait ${traitOf(h).n} · ${traitOf(h).d}</div>`:''}
-    <h2 style="margin-top:14px">Compétences</h2><div class="sklist">${skillsOf(h).map((k,i)=>`<div class="skill"><b>${i+1}. ${k.n}${k.cd?` · recharge ${k.cd} tours`:''}</b>${k.d}</div>`).join('')}
+    <h2 style="margin-top:14px">Compétences</h2><p class="meta" style="margin:0 0 6px">Tomes de maîtrise : <b>${S.tomes||0}</b> · ils s’obtiennent tous les 10 étages de la Tour et des tours élémentaires, au coffre des missions du jour, dans le guide et à la 1ʳᵉ place du Draft.</p><div class="sklist">${skillsOf(h).map((k0,i)=>{const l=skLv(h,i),k=skillAt(k0,l),c=SK_COST[l+1];return`<div class="skill"><div class="skhead"><b>${i+1}. ${k.n} · Niv. ${l}/${SK_MAX}${k.cd?` · recharge ${k.cd} tours`:''}</b>${l<SK_MAX?`<button class="btn sm${(S.tomes||0)>=c?' prime':''}" data-act="skup" data-id="${h.id}:${i}" ${(S.tomes||0)>=c?'':'disabled'}>Améliorer · ${c} tome${c>1?'s':''}</button>`:'<span class="good">Max</span>'}</div>${k0.d}${l<SK_MAX?`<div class="meta">Niveau ${l+1} : ${skStep(k0,l+1)}</div>`:''}</div>`}).join('')}
       <div class="skill lead"><b>♛ Chef · ${leadText(leaderOf(h))}</b>S’applique quand ce héros occupe la première case de la formation (avant gauche).</div></div>
     <h2 style="margin-top:14px">Statistiques</h2>
     <div class="statgrid">${row('PV','hp')}${row('ATQ','atk')}${row('DÉF','def')}${row('VIT','spd')}${row('Taux crit','crit',1)}${row('Dég. crit','cdmg',1)}${row('Pénétration','pen',1)}${row('Précision','acc',1)}${row('Résistance','res',1)}</div>
@@ -2755,7 +2787,7 @@ function bracketHtml(t){
     return`<div class="bcol"><div class="meta">${c}</div>${Array.from({length:8>>r},(_,i)=>{const n=l?l[i]:null,me=n&&t.ent[n].me,won=n&&nx&&nx.includes(n),lost=n&&nx&&!won;
       return`<div class="bk${me?' me':''}${won?' won':''}${lost?' lost':''}">${n||'?'}</div>`}).join('')}</div>`}).join('')}</div></div>`;
 }
-const fmtR=r=>[r.gems?`${r.gems} ◆`:'',r.gold?`${r.gold.toLocaleString('fr-FR')} or`:'',r.shards?`${r.shards} éclats`:'',r.item?'1 pièce rang S':''].filter(Boolean).join(' · ');
+const fmtR=r=>[r.gems?`${r.gems} ◆`:'',r.gold?`${r.gold.toLocaleString('fr-FR')} or`:'',r.shards?`${r.shards} éclats`:'',r.item?'1 pièce rang S':'',r.tomes?`${r.tomes} Tome${r.tomes>1?'s':''} de maîtrise`:''].filter(Boolean).join(' · ');
 function evBody(inst){
   const def=inst.def,p=evp(inst),pw=power(),rows=[];
   const desc={tour:'8 guildes, élimination directe en 3 tours. Les adversaires s’adaptent à votre puissance.',royale:'Un seul champion contre 15 autres, chacun pour soi. Dès le 4ᵉ tour, la tempête blesse tout le monde.',raid:`Infligez un maximum de dégâts à ${def.boss} en 12 tours. Il frappe toute la formation tous les 3 tours.`,survie:'Repoussez le plus de vagues possible. Les PV sont conservés d’une vague à l’autre (+20 % de soins entre deux vagues).',tresor:`Battez les gardiens pour gagner une pièce d’équipement de rang ${RANK[def.minRank||4]} minimum (${(def.slots||[]).map(k=>SLOT[k].n.toLowerCase()).join(', ')}).`}[def.type];
@@ -3041,6 +3073,7 @@ document.addEventListener('click',e=>{
     case 'btgt':bTarget(+id);break;
     case 'bgo':{const w=bWait();if(w)bAct({i:w.sel});break}
     case 'bauto':bAuto();break;
+    case 'skup':{const [a,b]=String(id).split(':');skillUp(+a,+b);break}
     case 'bmode':S.settings=S.settings||{};S.settings.manual=!S.settings.manual;save();render();toast(S.settings.manual?'Mode manuel : vous choisissez les compétences et les cibles.':'Mode auto : vos héros combattent seuls.');break;
     case 'pull1':summon(1);break;
     case 'pull10':summon(10);break;
