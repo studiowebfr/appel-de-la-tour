@@ -531,7 +531,7 @@ button.me{border:0;cursor:pointer}
 @keyframes ultin{0%{opacity:0;transform:scaleX(.3)}15%{opacity:1;transform:scaleX(1)}80%{opacity:1}100%{opacity:0}}
 .log p.ult{color:#7a2fb0;font-weight:800}
 @media (prefers-reduced-motion:reduce){.fnum,.ult.show,.tok.act .tface,.tok.hit .tface{animation:none}}
-.trait{font-size:11.5px;font-weight:800;color:#9fd8ff;background:rgba(90,180,255,.1);border:1.5px solid rgba(90,180,255,.35);border-radius:8px;padding:3px 7px;line-height:1.3}
+.trait{--tc:#9fd8ff;font-size:12px;font-weight:700;color:#eaf4ff;background:color-mix(in srgb,var(--tc) 22%,rgba(6,14,32,.85));border:1.5px solid var(--tc);border-left-width:5px;border-radius:8px;padding:4px 8px;line-height:1.3;box-shadow:0 0 10px color-mix(in srgb,var(--tc) 40%,transparent)}.trait b{color:var(--tc);font-weight:900;text-transform:uppercase;letter-spacing:.04em}
 .setn{color:#9fd8ff;font-weight:800}
 @media (max-width:420px){
   .battle{grid-template-columns:1fr}
@@ -887,10 +887,10 @@ function portrait(h,bare){
 
 /* ---------- Données ---------- */
 const TRAITS=[
-  {k:'robuste',n:'Robuste',d:'+12 % de PV',m:{hpp:12}},{k:'feroce',n:'Féroce',d:'+10 % d’ATQ',m:{atkp:10}},
-  {k:'tenace',n:'Tenace',d:'+12 % de DÉF',m:{defp:12}},{k:'vif',n:'Vif',d:'+2 VIT',m:{spd:2}},
-  {k:'precis',n:'Précis',d:'+8 % de taux critique',m:{crit:8}},{k:'brutal',n:'Brutal',d:'+20 % de dégâts critiques',m:{cdmg:20}},
-  {k:'percant',n:'Perçant',d:'+10 % de pénétration',m:{pen:10}},{k:'equilibre',n:'Équilibré',d:'+5 % de PV, d’ATQ et de DÉF',m:{hpp:5,atkp:5,defp:5}}
+  {k:'robuste',c:'#5fe08a',n:'Robuste',d:'+12 % de PV',m:{hpp:12}},{k:'feroce',c:'#ff6b5a',n:'Féroce',d:'+10 % d’ATQ',m:{atkp:10}},
+  {k:'tenace',c:'#6fb7ff',n:'Tenace',d:'+12 % de DÉF',m:{defp:12}},{k:'vif',c:'#ffd35a',n:'Vif',d:'+2 VIT',m:{spd:2}},
+  {k:'precis',c:'#ffa14a',n:'Précis',d:'+8 % de taux critique',m:{crit:8}},{k:'brutal',c:'#ff5fa8',n:'Brutal',d:'+20 % de dégâts critiques',m:{cdmg:20}},
+  {k:'percant',c:'#c38bff',n:'Perçant',d:'+10 % de pénétration',m:{pen:10}},{k:'equilibre',c:'#5fe0d0',n:'Équilibré',d:'+5 % de PV, d’ATQ et de DÉF',m:{hpp:5,atkp:5,defp:5}}
 ];
 const SETS={
   vitalite:{n:'Vitalité',p:2,b:{hpp:15},d:'+15 % PV'},
@@ -2914,7 +2914,7 @@ function heroCard(h,mode,note,delay){
   return`<article class="hero r${h.stars}${fuseTarget===h.id&&mode==='full'?' fuse-on':''}"${style}>
     ${flag}<div class="pic">${portrait(h)}</div>
     <div><div class="hname">${h.name}${awkTag(h)}</div>${L?`<div class="title">${L.title}</div>`:''}${starsHtml(h.stars)}${dupStars(h)}</div>
-    <div class="meta">${elChip(h.el)} ${CLASSES[h.cls].n} · Niv. ${h.lvl}${h.lvl>=cap?' (max)':''}</div>${traitOf(h)?`<div class="trait">${traitOf(h).n} · ${traitOf(h).d}</div>`:''}
+    <div class="meta">${elChip(h.el)} ${CLASSES[h.cls].n} · Niv. ${h.lvl}${h.lvl>=cap?' (max)':''}</div>${traitOf(h)?`<div class="trait" style="--tc:${traitOf(h).c}"><b>${traitOf(h).n}</b> · ${traitOf(h).d}</div>`:''}
     ${L?skillBox(L):''}
     ${mode==='pull'?'':hpBar(h.hp,s.hp)}
     ${mode==='full'?`<dl class="st"><div><dt>ATQ</dt><dd>${s.atk}</dd></div><div><dt>DÉF</dt><dd>${s.def}</dd></div><div><dt>VIT</dt><dd>${s.spd}</dd></div><div><dt>CRIT</dt><dd>${s.crit}%</dd></div><div><dt>D.CRIT</dt><dd>${s.cdmg}%</dd></div><div><dt>PÉN</dt><dd>${s.pen}%</dd></div></dl>
@@ -3158,7 +3158,7 @@ function renderSheet(){
     <div class="sheethead" style="margin-top:12px"><div class="pic">${portrait(h)}</div>
       <div style="display:grid;gap:5px;min-width:0"><div class="hname" style="font-size:22px">${h.name}${awkTag(h)}</div>${L?`<div class="title">${L.title}</div>`:''}${starsHtml(h.stars)}${dupStars(h)}
       <div class="meta">${elChip(h.el)} ${CLASSES[h.cls].n} · Niv. ${h.lvl}</div>${hpBar(h.hp,s.hp)}</div></div>
-    ${L?`<div style="margin-top:10px">${skillBox(L)}</div>`:''}${traitOf(h)?`<div class="trait" style="margin-top:8px">Trait ${traitOf(h).n} · ${traitOf(h).d}</div>`:''}
+    ${L?`<div style="margin-top:10px">${skillBox(L)}</div>`:''}${traitOf(h)?`<div class="trait" style="margin-top:8px;--tc:${traitOf(h).c}">Trait <b>${traitOf(h).n}</b> · ${traitOf(h).d}</div>`:''}
     <h2 style="margin-top:14px">Compétences</h2><p class="meta" style="margin:0 0 6px">Tomes de maîtrise : <b>${S.tomes||0}</b> · ils s’obtiennent tous les 10 étages de la Tour et des tours élémentaires, au coffre des missions du jour, dans le guide et à la 1ʳᵉ place du Draft.</p><div class="sklist">${skillsOf(h).map((k0,i)=>{const l=skLv(h,i),k=skillAt(k0,l),c=SK_COST[l+1];return`<div class="skill"><div class="skhead"><b>${i+1}. ${k.n} · Niv. ${l}/${SK_MAX}${k.cd?` · recharge ${k.cd} tours`:''}</b>${l<SK_MAX?`<button class="btn sm${(S.tomes||0)>=c?' prime':''}" data-act="skup" data-id="${h.id}:${i}" ${(S.tomes||0)>=c?'':'disabled'}>Améliorer · ${c} tome${c>1?'s':''}</button>`:'<span class="good">Max</span>'}</div>${k0.d}${l<SK_MAX?`<div class="meta">Niveau ${l+1} : ${skStep(k0,l+1)}</div>`:''}</div>`}).join('')}
       <div class="skill lead"><b>♛ Chef · ${leadText(leaderOf(h))}</b>S’applique quand ce héros est nommé chef : touchez la couronne ♛ sur sa case dans la formation.</div></div>
     <h2 style="margin-top:14px">Statistiques</h2>
