@@ -649,6 +649,17 @@ img.art.foe{object-position:50% 50%}
 .btn.hardbtn{background:linear-gradient(180deg,#ff5a4a,#9b1420);border-color:#ffb0a0;color:#fff}
 .refill{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin-top:10px}
 .refill .btn svg{width:18px;height:18px;vertical-align:-4px}
+.seti{display:inline-grid;place-items:center;width:18px;height:18px;margin-right:4px;vertical-align:-4px;color:var(--sc);filter:drop-shadow(0 0 3px color-mix(in srgb,var(--sc) 70%,transparent));flex:none}
+.seti svg{width:100%;height:100%}
+.settag{display:inline-flex;align-items:center;gap:0;padding:1px 7px 1px 4px;border-radius:999px;font-weight:800;color:var(--sc);border:1px solid color-mix(in srgb,var(--sc) 60%,transparent);background:color-mix(in srgb,var(--sc) 14%,transparent);white-space:nowrap}
+.settag .seti{width:15px;height:15px;margin-right:3px;vertical-align:0}
+.setc{border-left:4px solid var(--sc,#7fdcff)}.setc b{display:flex;align-items:center;color:var(--sc,#bff0ff)!important}
+.gs{position:relative}.seti.corner{position:absolute;top:4px;left:4px;width:20px;height:20px;margin:0;padding:2px;border-radius:6px;background:rgba(0,0,0,.55);border:1px solid var(--sc)}
+.chipbtn .seti{width:15px;height:15px;vertical-align:-3px}
+.synmini span.seti{width:16px;height:16px;background:none;border:0;padding:0;border-radius:0;color:var(--sc)}
+.recy{margin:0 0 10px;padding:8px 10px;border-radius:10px;border:1px solid rgba(255,211,90,.45);background:rgba(40,30,6,.35)}
+.recy summary{cursor:pointer;font-weight:800;color:#ffd35a;display:flex;align-items:center;gap:6px}.recy summary svg{width:18px;height:18px}
+.reck{display:flex;align-items:center;gap:8px;margin:8px 0;font-size:13px;min-height:32px}.reck input{width:18px;height:18px}
 </style>
 
 <div class="app">
@@ -917,12 +928,32 @@ const SETS={
   soif:{n:'Soif de sang',p:4,fx:'vamp',d:'se soigne de 25 % des dégâts infligés'},
   effroi:{n:'Effroi',p:4,fx:'stun',d:'20 % de chance d’étourdir la cible à chaque coup'}
 };
+
+/* Logos des sets : une forme et une couleur par set */
+const SETI={
+  vitalite:['#5fe08a','<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z" fill="currentColor" fill-opacity=".25"/><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/><path d="M12 9v6M9 12h6"/>'],
+  bastion:['#6fb7ff','<path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z" fill="currentColor" fill-opacity=".25"/><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z"/><path d="M12 7v11"/>'],
+  puissance:['#ff6b5a','<path d="M14.5 3.5l6 0 0 6L10 20l-6-6z" fill="currentColor" fill-opacity=".25"/><path d="M14.5 3.5h6v6L10 20l-6-6zM7 17l-3 3M13 8l3 3"/>'],
+  predateur:['#ffa14a','<path d="M6 4c3 4 4 9 3 16M11 3c3 5 4 10 2 17M16 4c3 4 3 9 1 15"/>'],
+  perforation:['#c38bff','<path d="M3 21L21 3M15 3h6v6M3 13l4 4M9 19l-2-2"/><circle cx="12" cy="12" r="3" fill="currentColor" fill-opacity=".35"/>'],
+  precision:['#7fe8ff','<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3.5" fill="currentColor" fill-opacity=".35"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/>'],
+  resolution:['#5fe0d0','<circle cx="12" cy="5" r="2"/><path d="M12 7v13M7 11h10M5 14c0 4 3 6 7 6s7-2 7-6"/>'],
+  represailles:['#ffcf5a','<path d="M4 4l10 10M4 4h4M4 4v4M20 4L10 14M20 4h-4M20 4v4M7 17l-3 3M17 17l3 3M8 14l2 2M16 14l-2 2"/>'],
+  fureur:['#ff4d6d','<path d="M12 21c-4 0-6.5-2.7-6.5-6 0-4 3.5-5.5 3.5-10 2.5 1.5 4 4 4 6 1-1 1.5-2.5 1.5-3.5 2.5 2 4 4.8 4 7.5 0 3.3-2.5 6-6.5 6z" fill="currentColor" fill-opacity=".25"/><path d="M12 21c-4 0-6.5-2.7-6.5-6 0-4 3.5-5.5 3.5-10 2.5 1.5 4 4 4 6 1-1 1.5-2.5 1.5-3.5 2.5 2 4 4.8 4 7.5 0 3.3-2.5 6-6.5 6z"/>'],
+  celerite:['#ffe066','<path d="M4 6l6 6-6 6M11 6l6 6-6 6M18 6v12"/>'],
+  frenesie:['#ff5fd2','<path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5"/><path d="M12 8v4l3 2"/>'],
+  soif:['#e0304a','<path d="M12 3c-3 4.5-6 7.8-6 11a6 6 0 0 0 12 0c0-3.2-3-6.5-6-11z" fill="currentColor" fill-opacity=".3"/><path d="M12 3c-3 4.5-6 7.8-6 11a6 6 0 0 0 12 0c0-3.2-3-6.5-6-11z"/><path d="M10 13l1 3 1-3M13 13l1 3 1-3"/>'],
+  effroi:['#9d7bff','<path d="M12 3a7 7 0 0 0-7 7v3l2 2v3h10v-3l2-2v-3a7 7 0 0 0-7-7z" fill="currentColor" fill-opacity=".22"/><path d="M12 3a7 7 0 0 0-7 7v3l2 2v3h10v-3l2-2v-3a7 7 0 0 0-7-7zM10 18v2M14 18v2"/><circle cx="9.5" cy="11" r="1.5" fill="currentColor"/><circle cx="14.5" cy="11" r="1.5" fill="currentColor"/>']
+};
+const setIc=(k,cls)=>SETI[k]?`<span class="seti${cls?' '+cls:''}" style="--sc:${SETI[k][0]}" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${SETI[k][1]}</svg></span>`:'';
+const setTag=k=>SETS[k]?`<span class="settag" style="--sc:${SETI[k]?SETI[k][0]:'#bff0ff'}">${setIc(k)}${SETS[k].n}</span>`:'';
+
 const STATSETS=Object.keys(SETS).filter(k=>!SETS[k].fx);
 /* Sets à 2 pièces : le bonus se cumule par paire (jusqu'à 3 fois). Sets à 4 pièces et sets à effet : une seule fois. */
 const setTimes=(k,n)=>{const st=SETS[k];if(!st||n<st.p)return 0;return st.p===2&&!st.fx?Math.floor(n/2):1};
-const setLine=(k,n)=>{const st=SETS[k],t=setTimes(k,n);return`Set ${st.n} (${n}/${st.p}) : ${st.d}${t>1?` ×${t}`:''}`};
+const setLine=(k,n)=>{const st=SETS[k],t=setTimes(k,n);return`${setIc(k)}Set ${st.n} (${n}/${st.p}) : ${st.d}${t>1?` ×${t}`:''}`};
 function setEffOf(h){const e={};if(!h||h.id==null||h.pvpMerc)return e;const sc=setCounts(h);for(const k in sc){const st=SETS[k];if(st&&st.fx&&sc[k]>=st.p)e[st.fx]=1}return e}
-const setDesc=k=>`${SETS[k].n} · ${SETS[k].p} pièces : ${SETS[k].d}${SETS[k].p===2&&!SETS[k].fx?' (cumulable)':''}`;
+const setDesc=k=>`${setIc(k)}<b style="color:${SETI[k]?SETI[k][0]:'inherit'}">${SETS[k].n}</b> · ${SETS[k].p} pièces : ${SETS[k].d}${SETS[k].p===2&&!SETS[k].fx?' (cumulable)':''}`;
 const traitOf=h=>TRAITS.find(t=>t.k===h.trait);
 function setCounts(h){const c={};if(!S||!S.inv||h.id==null)return c;for(const it of S.inv)if(it.by===h.id&&it.set)c[it.set]=(c[it.set]||0)+1;return c}
 function gearSum(h,none){
@@ -2693,6 +2724,25 @@ function sellItem(id){
   pendingSell=null;const v=sellValue(it);S.gold+=v;S.inv=S.inv.filter(i=>i!==it);save();render();toast(`${it.name} vendu (+${v} or).`);
 }
 
+/* Recyclage rapide : vend d'un coup les pièces non portées des rangs choisis */
+let recSel=new Set([1,2]),recKeep=true,recAsk=false,recOpen=false;
+const recList=()=>S.inv.filter(i=>i.by==null&&recSel.has(i.rar)&&(!recKeep||!i.plus));
+function recycle(){
+  const L=recList();if(!L.length)return toast('Aucune pièce à recycler avec ces critères.');
+  if(!recAsk){recAsk=true;render();setTimeout(()=>{if(recAsk){recAsk=false;render()}},4000);return}
+  recAsk=false;const v=L.reduce((t,i)=>t+sellValue(i),0),ids=new Set(L.map(i=>i.id));S.gold+=v;S.inv=S.inv.filter(i=>!ids.has(i.id));sfx('loot');save();render();
+  toast(`${L.length} pièce${L.length>1?'s':''} recyclée${L.length>1?'s':''} : +${fmtN(v)} or.`);
+}
+function renderRecycle(){
+  const L=recList(),v=L.reduce((t,i)=>t+sellValue(i),0),free=r=>S.inv.filter(i=>i.by==null&&i.rar===r).length;
+  return`<details class="recy"${recOpen?' open':''}><summary>${ui('loot')} Recyclage rapide</summary>
+    <p class="meta" style="margin:6px 0">Touchez les rangs à recycler. Les pièces portées par un héros ne sont jamais recyclées.</p>
+    <div class="chips">${[1,2,3,4,5,6].map(r=>`<button class="chipbtn" data-act="recr" data-id="${r}" aria-pressed="${recSel.has(r)}">${rankTag(r)} ${free(r)}</button>`).join('')}</div>
+    <label class="reck"><input type="checkbox" data-act="reck" ${recKeep?'checked':''}> Garder les pièces déjà améliorées (+1 et plus)</label>
+    <button class="btn ${recAsk?'warn':'prime'}" data-act="recgo" ${L.length&&!busy?'':'disabled'}>${recAsk?`Confirmer : recycler ${L.length} pièce${L.length>1?'s':''}`:`Recycler ${L.length} pièce${L.length>1?'s':''} · +${fmtN(v)} or`}</button>
+  </details>`;
+}
+
 /* ---------- Donjons ---------- */
 function tickEnergy(){
   if(!S)return;const now=Date.now();
@@ -3014,6 +3064,8 @@ function genHardFoes(f){
   if(f%10===0){const b=f===TOWER_MAX?'Souverain de la Tour':BOSSES[(f/10-1)%BOSSES.length];return[{n:b,hp:Math.round(380*sc),atk:Math.round(17*sc),def:Math.round(7*sc),spd:8,boss:true,el:fe[0],lv:e}]}
   return Array.from({length:5},()=>{const t=pick(FOES);return{n:t.n,hp:Math.round(t.hp*sc),atk:Math.round(t.atk*sc),def:Math.round(t.def*sc),spd:t.spd,el:pick(fe),lv:e}});
 }
+/* Récompenses Difficile : toujours au-dessus de l'étage 250 en Normal (520 cristaux, 3 150 or) */
+const hardRw=f=>{const b=f%10===0;return{gems:600+f*5+(b?500:0),gold:4000+f*80+(b?8000:0),shards:6+Math.floor(f/20)+(b?40+Math.floor(f/4):0),tomes:b?(f%50===0?3:2):0}};
 function hardState(){if(!S.hard)S.hard={floor:1,best:0,foes:null};if(!S.hard.foes&&S.hard.floor<=TOWER_MAX)S.hard.foes=genHardFoes(S.hard.floor);return S.hard}
 function climbHard(){
   if(busy||!hardOn())return;const H=hardState();
@@ -3024,11 +3076,11 @@ function climbHard(){
   startBattle(party,H.foes,S.slots,sum,res=>{sum.win=res.win;
     casualties(res,sum,`Difficile, étage ${f}`);
     sum.head=res.win?`Étage ${f} Difficile conquis !`:`Repoussés à l’étage ${f} Difficile.`;
-    if(res.win){rareDrop(sum);
-      const boss=f%10===0;
-      sum.gems=60+f*3+(boss?200:0);sum.gold=Math.round((400+f*40+(boss?2000:0))*goldMul());sum.shards=boss?20+Math.floor(f/5):0;
-      S.gems+=sum.gems;S.gold+=sum.gold;S.shards+=sum.shards;if(boss)sum.tomes=giveTomes(f%50===0?2:1);
-      grantXp(party,200+f*12,sum);track('climb');
+    if(res.win){rareDrop(sum);if(Math.random()<.5)rareDrop(sum);
+      const r=hardRw(f);
+      sum.gems=r.gems;sum.gold=Math.round(r.gold*goldMul());sum.shards=Math.round(r.shards*shardMul());
+      S.gems+=sum.gems;S.gold+=sum.gold;S.shards+=sum.shards;if(r.tomes)sum.tomes=giveTomes(r.tomes);
+      grantXp(party,800+f*20,sum);track('climb');
       H.floor++;H.best=Math.max(H.best,f);
       if(f>=TOWER_MAX){S.gems+=5000;S.gold+=100000;S.shards+=500;S.tears=(S.tears||0)+1;giveTomes(5);sum.done='Tour Difficile terminée ! Récompense finale : +5 000 cristaux, +100 000 or, +500 éclats, +5 Tomes de maîtrise et 1 Larme de l’Oracle.'}
       H.foes=H.floor>TOWER_MAX?[]:genHardFoes(H.floor);
@@ -3039,7 +3091,7 @@ function renderTowerHard(){
   const H=hardState(),f=H.floor,boss=f%10===0,foes=H.foes||[],names=labelFoes(foes);
   const party=partyHeroes(),able=party.some(h=>h.hp>0),hurt=S.heroes.some(h=>h.hp<stats(h).hp);
   const counters=[...new Set(foes.map(x=>Object.keys(ELEM).find(k=>ELEM[k].beats===x.el)).filter(Boolean))];
-  const nb=f>TOWER_MAX?0:boss?{g:60+f*3+200,o:400+f*40+2000}:{g:60+f*3,o:400+f*40};
+  const nb=f>TOWER_MAX?0:hardRw(f);
   return`${towerModeChips()}<section class="panel hardp">
     <div class="floorhead">
       <div class="floorno"><small>Difficile · étage sur ${TOWER_MAX}</small>${f>TOWER_MAX?'Fin':f}${boss?'<br><span class="bosstag">Gardien d’étage</span>':''}</div>
@@ -3051,7 +3103,7 @@ function renderTowerHard(){
       <p class="permadeath">${ui('memorial')}<span><b>Mode Difficile</b> : 5 ennemis à chaque étage, tous capables d’étourdir et d’affaiblir vos héros. La mort reste définitive.</span></p>
     </div>
     <div class="foes">${foes.map((x,i)=>`<div class="foe${x.boss?' boss':''}">${elChip(x.el)} <b>${names[i]}</b> <span class="muted">PV ${fmtN(x.hp)} · ATQ ${fmtN(x.atk)}</span></div>`).join('')}</div>
-    ${f<=TOWER_MAX?`<p class="note">Efficace contre cet étage : ${counters.map(elChip).join(' ')} · Récompense : ${fmtN(nb.g)} cristaux, ${fmtN(nb.o)} or${boss?`, des éclats et ${f%50===0?2:1} Tome${f%50===0?'s':''} de maîtrise`:''}.</p>`:''}
+    ${f<=TOWER_MAX?`<p class="note">Efficace contre cet étage : ${counters.map(elChip).join(' ')} · Récompense : ${fmtN(nb.gems)} cristaux, ${fmtN(Math.round(nb.gold*goldMul()))} or, ${nb.shards} éclats${nb.tomes?` et ${nb.tomes} Tomes de maîtrise`:''} · chance de Larme de l’Oracle ×1,5.</p>`:''}
     <p class="note">Il faut une équipe au sommet (héros 6★ niveau 60, doublons, équipement SS +15 et bons sets) pour aller au bout. Record : étage ${H.best}.</p>
   </section>
   ${lastBattle&&lastBattle.mode==='tower'?renderBattle():''}
@@ -3220,7 +3272,7 @@ function itemCard(it,mode){
   if(mode==='bag')acts=enh+(w?'':`<button class="btn sm${pendingSell===it.id?' warn':''}" data-act="sell" data-id="${it.id}">${pendingSell===it.id?`Confirmer · +${sellValue(it)}`:'Vendre'}</button>`);
   if(mode==='pick')acts=`<button class="btn sm prime" data-act="equip" data-id="${it.id}">${w?'Prendre':'Équiper'}</button>`+enh;
   if(mode==='worn')acts=enh+`<button class="btn sm" data-act="unequip" data-id="${it.id}">Retirer</button>`;
-  return`<article class="item q${it.rar}"><div class="ihead"><span class="iic">${gi(it.slot)}</span><div style="min-width:0"><div class="iname">${it.name} <b>+${it.plus}</b></div><div class="meta">${rankTag(it.rar)} ${sl.n} · niv. ${it.tier}${it.set&&SETS[it.set]?` · <span class="setn">Set ${SETS[it.set].n}</span>`:''}</div></div></div>
+  return`<article class="item q${it.rar}"><div class="ihead"><span class="iic">${gi(it.slot)}</span><div style="min-width:0"><div class="iname">${it.name} <b>+${it.plus}</b></div><div class="meta">${rankTag(it.rar)} ${sl.n} · niv. ${it.tier}${it.set&&SETS[it.set]?` · ${setTag(it.set)}`:''}</div></div></div>
     <div class="imain"><span>${STAT[it.main]}</span><b>${fmt(it.main,mainVal(it))}</b></div>
     ${it.subs.length?`<ul class="isubs">${it.subs.map(x=>`<li><span>${STAT[x.k]}${x.n>1?` <span class="up">${'▲'.repeat(x.n-1)}</span>`:''}</span><b>${fmt(x.k,x.v)}</b></li>`).join('')}</ul>`:'<div class="meta">Aucune stat secondaire</div>'}
     ${w&&mode!=='worn'?`<div class="worn">Porté par ${w.name}</div>`:''}
@@ -3231,7 +3283,7 @@ function renderSheet(){
   const h=heroById(sheetId),s=stats(h),b=stats(h,true),L=h.leg&&LEGENDS[h.leg];
   const row=(lab,k,pct)=>{const d=s[k]-b[k];return`<div class="stat"><span>${lab}</span><b>${s[k]}${pct?' %':''}${d?`<i>+${d}</i>`:''}</b></div>`};
   const gear=SLOTS.map(sl=>{const it=S.inv.find(i=>i.by===h.id&&i.slot===sl.k),on=pickSlot===sl.k?' on':'';
-    return it?`<button class="gs q${it.rar}${on}" data-act="gslot" data-id="${sl.k}"><span class="iic">${gi(sl.k)}</span>${rankTag(it.rar)}<span class="gn">${sl.n} +${it.plus}</span><span class="gm">${STAT[it.main]} ${fmt(it.main,mainVal(it))}</span></button>`
+    return it?`<button class="gs q${it.rar}${on}" data-act="gslot" data-id="${sl.k}">${setIc(it.set,'corner')}<span class="iic">${gi(sl.k)}</span>${rankTag(it.rar)}<span class="gn">${sl.n} +${it.plus}</span><span class="gm">${STAT[it.main]} ${fmt(it.main,mainVal(it))}</span></button>`
       :`<button class="gs empty${on}" data-act="gslot" data-id="${sl.k}"><span class="iic">${gi(sl.k)}</span><span class="gn">${sl.n}</span><span class="gm muted">Vide</span></button>`}).join('');
   return`<section class="panel"><button class="btn sm" data-act="closesheet">‹ Retour à la guilde</button>
     <div class="sheethead" style="margin-top:12px"><div class="pic">${portrait(h)}</div>
@@ -3289,7 +3341,8 @@ function renderBag(){
   const list=S.inv.filter(i=>(bagFilter==='all'||i.slot===bagFilter)&&(bagSet==='all'||i.set===bagSet)).sort((a,b)=>b.rar-a.rar||b.plus-a.plus||b.tier-a.tier||b.id-a.id);
   return`<section><h2>Sac</h2>${cat}
     <div class="chips"><button class="chipbtn" data-act="bagf" data-id="all" aria-pressed="${bagFilter==='all'}">Tout</button>${SLOTS.map(x=>`<button class="chipbtn" data-act="bagf" data-id="${x.k}" aria-pressed="${bagFilter===x.k}">${x.n}</button>`).join('')}</div>
-    <div class="chips"><button class="chipbtn" data-act="bags" data-id="all" aria-pressed="${bagSet==='all'}">Tous les sets</button>${Object.keys(SETS).filter(k=>S.inv.some(i=>i.set===k)).map(k=>`<button class="chipbtn" data-act="bags" data-id="${k}" aria-pressed="${bagSet===k}">${SETS[k].n} · ${S.inv.filter(i=>i.set===k).length}</button>`).join('')}</div>
+    ${renderRecycle()}
+    <div class="chips"><button class="chipbtn" data-act="bags" data-id="all" aria-pressed="${bagSet==='all'}">Tous les sets</button>${Object.keys(SETS).filter(k=>S.inv.some(i=>i.set===k)).map(k=>`<button class="chipbtn" data-act="bags" data-id="${k}" aria-pressed="${bagSet===k}">${setIc(k)}${SETS[k].n} · ${S.inv.filter(i=>i.set===k).length}</button>`).join('')}</div>
     ${list.length?`<div class="items">${list.map(i=>itemCard(i,'bag')).join('')}</div>`:'<p class="empty">Aucun équipement ici. Les donjons en font tomber.</p>'}
     <details class="setguide"><summary>Guide des sets</summary>${DUNGEONS.filter(d=>d.sets).map(d=>`<p><b>${d.n}</b><br>${d.sets.map(setDesc).join('<br>')}</p>`).join('')}<p class="note">Un héros porte 6 pièces : par exemple 4 Frénésie + 2 Puissance, ou 3 paires de sets à 2 pièces.</p></details><p class="note">Rangs : ${[1,2,3,4,5,6].map(rankTag).join(' ')}. Un rang plus haut donne une stat principale plus forte et plus de stats secondaires (D : 0, C : 1, B : 2, A : 3, S et SS : 4, et les stats du rang SS sont 20 % plus fortes). Tous les +3, une stat secondaire apparaît (jusqu’à 4) ou une existante augmente (▲). Pour équiper une pièce, ouvrez la fiche d’un héros.</p></section>`;
 }
@@ -3300,7 +3353,7 @@ function renderDungeon(){
   const cards=order.map(d=>{
     const L=S.dunSel[d.k],max=S.dun[d.k],foes=dunFoes(d.k),names=labelFoes(foes),fp=foesPower(foes),w=lootWeights(L);
     return`<section class="panel dun${d.k===fk?' feat':''}"><div class="dunhead"><span class="iic" style="--q:var(--brass)">${ui('dungeon')}</span><div style="min-width:0"><div class="hname" style="font-size:19px">${d.n}</div>${d.k===fk?'<div class="featb">En vedette aujourd’hui · récompenses ×2</div>':''}<div class="row" style="gap:5px;margin-top:4px">${d.type==='gear'?`<span class="tagslot">${gi('weapon')} 6 emplacements</span><span class="tagslot">${d.desc}</span>`:`<span class="tagslot">${d.type==='gold'?COIN+' Or':STARIC+' Éclats d’étoile'}</span>`}</div></div></div>
-      ${d.type==='gear'?`<div class="setlist">${d.sets.map(k=>`<div class="setc${SETS[k].fx?' fx':''}"><b>${SETS[k].n}</b><span class="sp">${SETS[k].p} pièces</span><span>${SETS[k].d}${SETS[k].p===2&&!SETS[k].fx?' (cumulable)':''}</span></div>`).join('')}</div>`:''}
+      ${d.type==='gear'?`<div class="setlist">${d.sets.map(k=>`<div class="setc${SETS[k].fx?' fx':''}" style="--sc:${SETI[k][0]}"><b>${setIc(k)}${SETS[k].n}</b><span class="sp">${SETS[k].p} pièces</span><span>${SETS[k].d}${SETS[k].p===2&&!SETS[k].fx?' (cumulable)':''}</span></div>`).join('')}</div>`:''}
       <div><div class="rowlab" style="margin-top:0"><b>Niveau ${L}</b><span>${max<DUN_MAX?`Battez le niveau ${max} pour débloquer le ${max+1}`:'Tous les niveaux débloqués'}</span></div>
       <div class="lvls">${Array.from({length:DUN_MAX},(_,i)=>i+1).map(l=>`<button class="lv" data-act="dlvl" data-id="${d.k}:${l}" aria-pressed="${l===L}" ${l>max||busy?'disabled':''}>${l}</button>`).join('')}</div></div>
       <div class="foes" style="margin-top:0">${foes.map((x,i)=>`<div class="foe${x.boss?' boss':''}">${elChip(x.el)} <b>${names[i]}</b> <span class="muted">PV ${x.hp} · ATQ ${x.atk}</span></div>`).join('')}</div>
@@ -3635,6 +3688,9 @@ document.addEventListener('click',e=>{
     case 'bagf':bagFilter=id;render();break;
     case 'bags':bagSet=id;render();break;
     case 'bagc':bagCat=id;render();break;
+    case 'recr':{recOpen=true;const r=+id;recSel.has(r)?recSel.delete(r):recSel.add(r);recAsk=false;render();break}
+    case 'reck':recOpen=true;recKeep=!recKeep;recAsk=false;render();break;
+    case 'recgo':recOpen=true;recycle();break;
     case 'dlvl':{if(busy)break;const [k,l]=id.split(':');S.dunSel[k]=Number(l);save();render();break}
     case 'drun':runDungeon(id);break;
     case 'asc':ascend(n);break;
