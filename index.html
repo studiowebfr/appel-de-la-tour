@@ -531,6 +531,7 @@ button.me{border:0;cursor:pointer}
 @keyframes ultin{0%{opacity:0;transform:scaleX(.3)}15%{opacity:1;transform:scaleX(1)}80%{opacity:1}100%{opacity:0}}
 .log p.ult{color:#7a2fb0;font-weight:800}
 @media (prefers-reduced-motion:reduce){.fnum,.ult.show,.tok.act .tface,.tok.hit .tface{animation:none}}
+.race{color:#c9b6ff;font-weight:600}
 .trait{--tc:#9fd8ff;font-size:12px;font-weight:700;color:#eaf4ff;background:color-mix(in srgb,var(--tc) 22%,rgba(6,14,32,.85));border:1.5px solid var(--tc);border-left-width:5px;border-radius:8px;padding:4px 8px;line-height:1.3;box-shadow:0 0 10px color-mix(in srgb,var(--tc) 40%,transparent)}.trait b{color:var(--tc);font-weight:900;text-transform:uppercase;letter-spacing:.04em}
 .setn{color:#9fd8ff;font-weight:800}
 @media (max-width:420px){
@@ -946,6 +947,7 @@ button.starplate{background:none;border:0;color:inherit;font:inherit;cursor:poin
 #sumfx,#sumfx *{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
 #sumfx{touch-action:none}
 #sumfx .sfx-stage{touch-action:pan-y}
+.safe{display:flex;align-items:center;gap:6px;margin:8px 0 0;font-size:12.5px;color:#9fe8b8}.safe svg{width:16px;height:16px;flex:none}
 </style>
 
 <div class="app">
@@ -984,8 +986,26 @@ const LEGENDS={
   morgane:{name:'Morgane',title:'Astre noir',cls:'mage',el:'ombre',seed:505,skin:'#f7e1cf',hair:'#6c4a8c',eye:'#9a4fb8',style:3,
     skill:'Pluie d’étoiles',desc:'Sa 3ᵉ compétence inflige 160 % de son ATQ à tous les ennemis et peut briser leur DÉF. Recharge en 3 tours.'},
   aelis:{name:'Aelis',title:'Voix du sanctuaire',cls:'healer',el:'eau',seed:606,skin:'#74482a',hair:'#c99f60',eye:'#b8862a',style:4,
-    skill:'Second souffle',desc:'Une fois par combat, ramène à la vie le premier allié qui tombe, avec 50 % de ses PV.'}
+    skill:'Second souffle',desc:'Une fois par combat, ramène à la vie le premier allié qui tombe, avec 50 % de ses PV.'},
+  garrok:{name:'Garrok',title:'Ours des cimes',cls:'tank',el:'terre',seed:707,skin:'#7a5232',hair:'#4a3020',eye:'#d9a03a',style:1,
+    skill:'Rugissement',desc:'Riposte souvent (15 %) quand il est frappé. Sa 3ᵉ compétence frappe tous les ennemis et réduit leur ATQ.'},
+  ysmira:{name:'Ysmira',title:'Fille du dragon',cls:'mage',el:'feu',seed:808,skin:'#d98a5a',hair:'#8a1f1f',eye:'#ffb02e',style:3,
+    skill:'Souffle draconique',desc:'Sa 3ᵉ compétence crache le feu sur tous les ennemis à 170 % de son ATQ.'},
+  sylvaris:{name:'Sylvaris',title:'Flèche d’argent',cls:'archer',el:'vent',seed:909,skin:'#f1dcc8',hair:'#d8e4ea',eye:'#46b8a8',style:2,
+    skill:'Tempête de flèches',desc:'Chaque coup a 20 % de chance d’étourdir. Sa 3ᵉ compétence touche tous les ennemis et les ralentit.'},
+  nyxa:{name:'Nyxa',title:'Renarde aux neuf flammes',cls:'mage',el:'ombre',seed:1010,skin:'#f4e0d0',hair:'#f0f0f6',eye:'#a05ad8',style:4,
+    skill:'Neuf flammes',desc:'20 % de chance de rejouer après son action. Sa 3ᵉ compétence frappe tous les ennemis et peut briser leur DÉF.'},
+  thorgal:{name:'Thorgal',title:'Marteau du givre',cls:'warrior',el:'eau',seed:1111,skin:'#e2b48e',hair:'#dfe8f0',eye:'#5ab4ff',style:1,
+    skill:'Marteau des runes',desc:'Sa 3ᵉ compétence écrase une cible à 300 % de son ATQ, avec 50 % de chance de l’étourdir.'},
+  liora:{name:'Liora',title:'Aile de l’aurore',cls:'healer',el:'lumiere',seed:1212,skin:'#f6e2cf',hair:'#f3d98a',eye:'#ffd75a',style:0,
+    skill:'Grâce céleste',desc:'Sa 3ᵉ compétence soigne toute l’équipe de 40 % de ses PV max et la purifie.'}
 };
+/* Effets passifs des légendes (mêmes mécaniques que les sets) */
+const LEGEFF={garrok:{counter:1},sylvaris:{stun:1},nyxa:{extra:1}};
+/* Races affichées sur les fiches */
+const RACE={Brakka:'Orque',Grimm:'Orque',Oona:'Dryade',Thalor:'Faune',Torvin:'Nain',Raksha:'Homme-bête · Tigre',Rhogar:'Draconide',Ashka:'Draconide',Vorn:'Homme-bête · Loup',Sora:'Homme-bête · Lapin',Kestrel:'Homme-bête · Faucon',Mio:'Homme-bête · Chat',Lyriel:'Elfe',Taliesin:'Elfe',Zahir:'Demi-démon',Morwen:'Elfe noire',Nerys:'Néréide',Fizz:'Gnome',
+  garrok:'Homme-bête · Ours',ysmira:'Draconide',sylvaris:'Elfe',nyxa:'Kitsune',thorgal:'Nain',liora:'Ange',valdrik:'Humain',seren:'Humaine',kaelen:'Humain',ilyas:'Humain',morgane:'Humaine',aelis:'Humaine'};
+const raceOf=h=>h?(RACE[h.leg]||RACE[h.name]||'Humain'):'';
 
 const ELEM={
   eau:{n:'Eau',c:'#5ab4ff',beats:'feu'},feu:{n:'Feu',c:'#ff7a45',beats:'vent'},
@@ -1004,6 +1024,9 @@ const SYN=[
   {k:'harmonie',name:'Harmonie',tiers:[4],desc:['+8 % d’ATQ pour toute l’équipe']}
 ];
 const BONDS=[
+  {k:'crocs',n:'Crocs et griffes',legs:['garrok','nyxa'],d:'Garrok et Nyxa ensemble : +8 % de taux critique pour l’équipe'},
+  {k:'forge',n:'Forge des anciens',legs:['thorgal','valdrik'],d:'Thorgal et Valdrik ensemble : +15 % de DÉF pour l’équipe'},
+  {k:'ciel',n:'Ciel embrasé',legs:['ysmira','liora'],d:'Ysmira et Liora ensemble : +15 % aux sorts de zone, +5 % d’ATQ'},
   {k:'aube',n:'Serment de l’aube',legs:['seren','aelis'],d:'Seren et Aelis ensemble : +10 % d’ATQ et de soins pour l’équipe'},
   {k:'meute',n:'Chasse sauvage',legs:['kaelen','ilyas'],d:'Kaelen et Ilyas ensemble : +8 % de taux critique pour l’équipe'},
   {k:'astres',n:'Astres jumeaux',legs:['morgane','seren'],d:'Morgane et Seren ensemble : +15 % aux sorts de zone, +5 % d’ATQ'},
@@ -1038,6 +1061,9 @@ function applySyn(units,syn){
   if(on('astres'))units.forEach(u=>{u.aoeMul*=1.15;u.atkMul*=1.05});
   if(on('rempart'))units.forEach(u=>u.defMul*=1.15);
   if(on('braise'))units.forEach(u=>u.pen=Math.min(80,(u.pen||0)+10));
+  if(on('crocs'))units.forEach(u=>u.crit=(u.crit||5)+8);
+  if(on('forge'))units.forEach(u=>u.defMul*=1.15);
+  if(on('ciel'))units.forEach(u=>{u.aoeMul*=1.15;u.atkMul*=1.05});
 }
 const MELEE=c=>c==='tank'||c==='warrior';
 function syncParty(){S.party=S.slots.filter(Boolean)}
@@ -1111,8 +1137,10 @@ const scHard=sc=>sc*diffMul(sc);
 function scMain(f){return f<=10?1+.15*(f-1):2.35+.40*(f-10)}
 const MULT=[0,1,1.25,1.55,1.95,2.5,3.1],STAR_MAX=6;
 const RATES=[{s:5,p:2},{s:4,p:8},{s:3,p:20},{s:2,p:30},{s:1,p:40}];
+const DUPGEM={1:5,2:10,3:25,4:60};
 const PITY=60, COST1=100, COST10=900, AWK_MAX=6;
-const ROSTER={'Aldric':'tank','Ysolde':'tank','Brann':'tank','Doran':'tank','Oskar':'tank','Ulric':'tank','Thessa':'tank','Orla':'tank','Joris':'tank','Ayla':'tank','Corvin':'warrior','Liv':'warrior','Kaen':'warrior','Talen':'warrior','Galen':'warrior','Arwel':'warrior','Nadja':'warrior','Vesna':'warrior','Faye':'warrior','Sven':'warrior','Lior':'archer','Wren':'archer','Yuren':'archer','Hael':'archer','Perrin':'archer','Zeph':'archer','Lysa':'archer','Kira':'archer','Inès':'archer','Séraphin':'mage','Cyra':'mage','Rhéa':'mage','Nox':'mage','Sorel':'mage','Quill':'mage','Edrin':'mage','Élodie':'mage','Tamsin':'mage','Mina':'mage','Bastien':'healer','Maëlis':'healer','Iro':'healer','Vale':'healer','Jun':'healer','Sena':'healer','Mireille':'healer','Anouk':'healer','Rurik':'healer'};
+const ROSTER={'Aldric':'tank','Ysolde':'tank','Brann':'tank','Doran':'tank','Oskar':'tank','Ulric':'tank','Thessa':'tank','Orla':'tank','Joris':'tank','Ayla':'tank','Corvin':'warrior','Liv':'warrior','Kaen':'warrior','Talen':'warrior','Galen':'warrior','Arwel':'warrior','Nadja':'warrior','Vesna':'warrior','Faye':'warrior','Sven':'warrior','Lior':'archer','Wren':'archer','Yuren':'archer','Hael':'archer','Perrin':'archer','Zeph':'archer','Lysa':'archer','Kira':'archer','Inès':'archer','Séraphin':'mage','Cyra':'mage','Rhéa':'mage','Nox':'mage','Sorel':'mage','Quill':'mage','Edrin':'mage','Élodie':'mage','Tamsin':'mage','Mina':'mage','Bastien':'healer','Maëlis':'healer','Iro':'healer','Vale':'healer','Jun':'healer','Sena':'healer','Mireille':'healer','Anouk':'healer','Rurik':'healer',
+  'Brakka':'tank','Grimm':'warrior','Oona':'healer','Thalor':'healer','Torvin':'tank','Raksha':'warrior','Rhogar':'tank','Ashka':'warrior','Vorn':'warrior','Sora':'archer','Kestrel':'archer','Mio':'healer','Lyriel':'archer','Taliesin':'archer','Zahir':'mage','Morwen':'mage','Nerys':'mage','Fizz':'mage'};
 const NAMES=Object.keys(ROSTER);
 const namesOf=c=>NAMES.filter(n=>ROSTER[n]===c);
 const FOES=[
@@ -1152,7 +1180,7 @@ const HAIRS=[
   'M33 35Q31 13 50 13Q69 13 67 35Q64 22 56 20L50 27L44 20Q36 22 33 35Z',
   'M34 31Q34 15 50 15Q66 15 66 31Q60 21 50 21Q40 21 34 31Z'
 ];
-const ART={"leg":["valdrik","seren","kaelen","ilyas","morgane","aelis"],"cls":{"archer":["archer-f1","archer-m1"],"healer":["healer-f1","healer-m1"],"mage":["mage-f1","mage-f2","mage-m1"],"tank":["tank-f1","tank-m1","tank-m2"],"warrior":["warrior-f1","warrior-m1"]},"foe":["ange-de-cendre","archange-dechu","behemoth-des-sables","bete-aux-mille-yeux","chevalier-creux","chevalier-noir","colosse-de-pierre","colosse-de-quartz","cultiste","dame-des-corbeaux","dragon-d-os","dragon-primordial","elementaire-de-braise","forgeron-spectral","gardienne-astrale","gargouille","gobelin","golem-de-mousse","golem-du-neant","golem-runique","golem-tellurique","h-aldric","h-anouk","h-arwel","h-ayla","h-bastien","h-brann","h-corvin","h-cyra","h-doran","h-edrin","h-elodie","h-faye","h-galen","h-hael","h-ines","h-iro","h-joris","h-jun","h-kaen","h-kira","h-lior","h-liv","h-lysa","h-maelis","h-mina","h-mireille","h-nadja","h-nox","h-orla","h-oskar","h-perrin","h-quill","h-rhea","h-rurik","h-sena","h-seraphin","h-sorel","h-sven","h-talen","h-tamsin","h-thessa","h-ulric","h-vale","h-vesna","h-wren","h-ysolde","h-yuren","h-zeph","harpie","hydre-des-abysses","hydre-des-marais","hydre-ecarlate","juge-sans-visage","kraken-abyssal","leviathan-des-profondeurs","liche-sans-nom","loup-cendre","mante-ombreuse","mimique","minotaure-d-airain","necromancien","ogre","ombre-devoreuse","reine-des-toiles","reine-mere-arachnide","roc-des-tempetes","roi-gobelin","salamandre-ardente","scorpion-geant","seigneur-des-marees","seigneur-du-neant","sorciere-des-marais","souverain-de-la-tour","spectre","squelette","titan-de-la-faille","titan-solaire","troll-des-glaces","wyrm-de-cristal","wyrm-des-cendres","wyverne-des-cimes"],"spr":["s-aelis","s-aldric","s-ange-de-cendre","s-anouk","s-archange-dechu","s-arwel","s-ayla","s-bastien","s-behemoth-des-sables","s-bete-aux-mille-yeux","s-brann","s-chevalier-creux","s-chevalier-noir","s-colosse-de-pierre","s-colosse-de-quartz","s-corvin","s-cultiste","s-cyra","s-dame-des-corbeaux","s-doran","s-dragon-d-os","s-dragon-primordial","s-edrin","s-elementaire-de-braise","s-elodie","s-faye","s-forgeron-spectral","s-galen","s-gardienne-astrale","s-gargouille","s-gobelin","s-golem-de-mousse","s-golem-du-neant","s-golem-runique","s-golem-tellurique","s-hael","s-harpie","s-hydre-des-abysses","s-hydre-des-marais","s-hydre-ecarlate","s-ilyas","s-ines","s-iro","s-joris","s-juge-sans-visage","s-jun","s-kaelen","s-kaen","s-kira","s-kraken-abyssal","s-leviathan-des-profondeurs","s-liche-sans-nom","s-lior","s-liv","s-loup-cendre","s-lysa","s-maelis","s-mante-ombreuse","s-mimique","s-mina","s-minotaure-d-airain","s-mireille","s-morgane","s-nadja","s-necromancien","s-nox","s-ogre","s-ombre-devoreuse","s-orla","s-oskar","s-perrin","s-quill","s-reine-des-toiles","s-reine-mere-arachnide","s-rhea","s-roc-des-tempetes","s-roi-gobelin","s-rurik","s-salamandre-ardente","s-scorpion-geant","s-seigneur-des-marees","s-seigneur-du-neant","s-sena","s-seraphin","s-seren","s-sorciere-des-marais","s-sorel","s-souverain-de-la-tour","s-spectre","s-squelette","s-sven","s-talen","s-tamsin","s-thessa","s-titan-de-la-faille","s-titan-solaire","s-troll-des-glaces","s-ulric","s-valdrik","s-vale","s-vesna","s-wren","s-wyrm-de-cristal","s-wyrm-des-cendres","s-wyverne-des-cimes","s-ysolde","s-yuren","s-zeph"],"bg":[]};
+const ART={"leg":["valdrik","seren","kaelen","ilyas","morgane","aelis","garrok","ysmira","sylvaris","nyxa","thorgal","liora"],"cls":{"archer":["archer-f1","archer-m1"],"healer":["healer-f1","healer-m1"],"mage":["mage-f1","mage-f2","mage-m1"],"tank":["tank-f1","tank-m1","tank-m2"],"warrior":["warrior-f1","warrior-m1"]},"foe":["ange-de-cendre","archange-dechu","behemoth-des-sables","bete-aux-mille-yeux","chevalier-creux","chevalier-noir","colosse-de-pierre","colosse-de-quartz","cultiste","dame-des-corbeaux","dragon-d-os","dragon-primordial","elementaire-de-braise","forgeron-spectral","gardienne-astrale","gargouille","gobelin","golem-de-mousse","golem-du-neant","golem-runique","golem-tellurique","h-aldric","h-anouk","h-arwel","h-ashka","h-ayla","h-bastien","h-brakka","h-brann","h-corvin","h-cyra","h-doran","h-edrin","h-elodie","h-faye","h-fizz","h-galen","h-grimm","h-hael","h-ines","h-iro","h-joris","h-jun","h-kaen","h-kestrel","h-kira","h-lior","h-liv","h-lyriel","h-lysa","h-maelis","h-mina","h-mio","h-mireille","h-morwen","h-nadja","h-nerys","h-nox","h-oona","h-orla","h-oskar","h-perrin","h-quill","h-raksha","h-rhea","h-rhogar","h-rurik","h-sena","h-seraphin","h-sora","h-sorel","h-sven","h-talen","h-taliesin","h-tamsin","h-thalor","h-thessa","h-torvin","h-ulric","h-vale","h-vesna","h-vorn","h-wren","h-ysolde","h-yuren","h-zahir","h-zeph","harpie","hydre-des-abysses","hydre-des-marais","hydre-ecarlate","juge-sans-visage","kraken-abyssal","leviathan-des-profondeurs","liche-sans-nom","loup-cendre","mante-ombreuse","mimique","minotaure-d-airain","necromancien","ogre","ombre-devoreuse","reine-des-toiles","reine-mere-arachnide","roc-des-tempetes","roi-gobelin","salamandre-ardente","scorpion-geant","seigneur-des-marees","seigneur-du-neant","sorciere-des-marais","souverain-de-la-tour","spectre","squelette","titan-de-la-faille","titan-solaire","troll-des-glaces","wyrm-de-cristal","wyrm-des-cendres","wyverne-des-cimes"],"spr":["s-aelis","s-aldric","s-ange-de-cendre","s-anouk","s-archange-dechu","s-arwel","s-ashka","s-ayla","s-bastien","s-behemoth-des-sables","s-bete-aux-mille-yeux","s-brakka","s-brann","s-chevalier-creux","s-chevalier-noir","s-colosse-de-pierre","s-colosse-de-quartz","s-corvin","s-cultiste","s-cyra","s-dame-des-corbeaux","s-doran","s-dragon-d-os","s-dragon-primordial","s-edrin","s-elementaire-de-braise","s-elodie","s-faye","s-fizz","s-forgeron-spectral","s-galen","s-gardienne-astrale","s-gargouille","s-garrok","s-gobelin","s-golem-de-mousse","s-golem-du-neant","s-golem-runique","s-golem-tellurique","s-grimm","s-hael","s-harpie","s-hydre-des-abysses","s-hydre-des-marais","s-hydre-ecarlate","s-ilyas","s-ines","s-iro","s-joris","s-juge-sans-visage","s-jun","s-kaelen","s-kaen","s-kestrel","s-kira","s-kraken-abyssal","s-leviathan-des-profondeurs","s-liche-sans-nom","s-lior","s-liora","s-liv","s-loup-cendre","s-lyriel","s-lysa","s-maelis","s-mante-ombreuse","s-mimique","s-mina","s-minotaure-d-airain","s-mio","s-mireille","s-morgane","s-morwen","s-nadja","s-necromancien","s-nerys","s-nox","s-nyxa","s-ogre","s-ombre-devoreuse","s-oona","s-orla","s-oskar","s-perrin","s-quill","s-raksha","s-reine-des-toiles","s-reine-mere-arachnide","s-rhea","s-rhogar","s-roc-des-tempetes","s-roi-gobelin","s-rurik","s-salamandre-ardente","s-scorpion-geant","s-seigneur-des-marees","s-seigneur-du-neant","s-sena","s-seraphin","s-seren","s-sora","s-sorciere-des-marais","s-sorel","s-souverain-de-la-tour","s-spectre","s-squelette","s-sven","s-sylvaris","s-talen","s-taliesin","s-tamsin","s-thalor","s-thessa","s-thorgal","s-titan-de-la-faille","s-titan-solaire","s-torvin","s-troll-des-glaces","s-ulric","s-valdrik","s-vale","s-vesna","s-vorn","s-wren","s-wyrm-de-cristal","s-wyrm-des-cendres","s-wyverne-des-cimes","s-ysmira","s-ysolde","s-yuren","s-zahir","s-zeph"],"bg":[]};
 const artUrl=n=>(window.ARTDATA&&window.ARTDATA[n])||`art/${n}.webp`;
 const artOn=()=>!(S&&S.settings&&S.settings.art===false);
 const slugify=n=>String(n).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[’']/g,'-').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
@@ -1239,7 +1267,7 @@ const STATSETS=Object.keys(SETS).filter(k=>!SETS[k].fx);
 /* Sets à 2 pièces : le bonus se cumule par paire (jusqu'à 3 fois). Sets à 4 pièces et sets à effet : une seule fois. */
 const setTimes=(k,n)=>{const st=SETS[k];if(!st||n<st.p)return 0;return st.p===2&&!st.fx?Math.floor(n/2):1};
 const setLine=(k,n)=>{const st=SETS[k],t=setTimes(k,n);return`${setIc(k)}Set ${st.n} (${n}/${st.p}) : ${st.d}${t>1?` ×${t}`:''}`};
-function setEffOf(h){const e={};if(!h||h.id==null||h.pvpMerc)return e;const sc=setCounts(h);for(const k in sc){const st=SETS[k];if(st&&st.fx&&sc[k]>=st.p)e[st.fx]=1}return e}
+function setEffOf(h){const e={};if(h&&h.leg&&LEGEFF[h.leg])Object.assign(e,LEGEFF[h.leg]);if(!h||h.id==null||h.pvpMerc)return e;const sc=setCounts(h);for(const k in sc){const st=SETS[k];if(st&&st.fx&&sc[k]>=st.p)e[st.fx]=1}return e}
 const setDesc=k=>`${setIc(k)}<b style="color:${SETI[k]?SETI[k][0]:'inherit'}">${SETS[k].n}</b> · ${SETS[k].p} pièces : ${SETS[k].d}${SETS[k].p===2&&!SETS[k].fx?' (cumulable)':''}`;
 const traitOf=h=>TRAITS.find(t=>t.k===h.trait);
 function setCounts(h){const c={};if(!S||!S.inv||h.id==null)return c;for(const it of S.inv)if(it.by===h.id&&it.set)c[it.set]=(c[it.set]||0)+1;return c}
@@ -1490,7 +1518,9 @@ function create(stars){
     }
     const h=makeLegend(key);S.heroes.push(h);return{id:h.id,note:'Légendaire'};
   }
-  const h=makeHero(stars);S.heroes.push(h);return{id:h.id,note:''};
+  const h=makeHero(stars),full=S.heroes.find(x=>!x.leg&&x.name===h.name&&x.cls===h.cls&&(x.awk||0)>=AWK_MAX);
+  if(full){S.next--;const g=DUPGEM[stars]||5;S.gems+=g;return{id:full.id,note:`Doublons max · +${g} ◆`}}
+  S.heroes.push(h);return{id:h.id,note:''};
 }
 function summon(n){
   const cost=n===10?COST10:COST1;
@@ -1537,6 +1567,12 @@ const SK={
 const LSK={
   seren:{2:{n:'Aube tranchante',cd:3,tg:'n',aoe:1.2,self:['atkUp',2],d:'Inflige 120 % de l’ATQ à tous les ennemis, puis augmente son ATQ pendant 2 tours.'}},
   morgane:{2:{n:'Pluie d’étoiles',cd:3,tg:'n',aoe:1.6,fx:['defDown',50,2],d:'Inflige 160 % de l’ATQ à tous les ennemis. 50 % de chance de réduire leur DÉF pendant 2 tours.'}},
+  garrok:{2:{n:'Rugissement',cd:3,tg:'n',aoe:.9,fx:['atkDown',70,2],d:'Inflige 90 % de l’ATQ à tous les ennemis. 70 % de chance de réduire leur ATQ pendant 2 tours.'}},
+  ysmira:{2:{n:'Souffle draconique',cd:4,tg:'n',aoe:1.7,d:'Crache le feu sur tous les ennemis : 170 % de l’ATQ.'}},
+  sylvaris:{2:{n:'Tempête de flèches',cd:3,tg:'n',aoe:1.3,fx:['slow',60,2],d:'Inflige 130 % de l’ATQ à tous les ennemis. 60 % de chance de les ralentir pendant 2 tours.'}},
+  nyxa:{2:{n:'Neuf flammes',cd:3,tg:'n',aoe:1.4,fx:['defDown',40,2],d:'Inflige 140 % de l’ATQ à tous les ennemis. 40 % de chance de réduire leur DÉF pendant 2 tours.'}},
+  thorgal:{2:{n:'Marteau des runes',cd:3,tg:'e',m:3,fx:['stun',50,1],d:'Écrase une cible : 300 % de l’ATQ. 50 % de chance de l’étourdir.'}},
+  liora:{2:{n:'Grâce céleste',cd:4,tg:'n',bless:.4,d:'Soigne toute l’équipe de 40 % de ses PV max, retire un effet négatif à chacun et augmente la VIT de l’équipe pendant 2 tours.'}},
   ilyas:{0:{n:'Double trait',tg:'e',m:1,twin:1,d:'Tire deux flèches de 100 % de l’ATQ : la seconde vise l’ennemi le plus affaibli.'}}
 };
 /* ---------- Niveaux de compétences (Tomes de maîtrise) ---------- */
@@ -1569,7 +1605,7 @@ function skillUp(id,i){
 function giveTomes(n,why){if(!n)return;S.tomes=(S.tomes||0)+n;return n}
 function skillsOf(h){const b=SK[h.cls];if(!b)return[];const o=(h.leg&&LSK[h.leg])||{};return b.map((s,i)=>o[i]||s)}
 const LEADN={hpp:'PV',atkp:'ATQ',defp:'DÉF',crit:'taux critique',cdmg:'dégâts critiques',spd:'VIT',acc:'Précision',res:'Résistance'};
-const LEAD_LEG={valdrik:{k:'hpp',v:25},seren:{k:'atkp',v:22},kaelen:{k:'cdmg',v:30},ilyas:{k:'spd',v:15},morgane:{k:'crit',v:15},aelis:{k:'res',v:35}};
+const LEAD_LEG={valdrik:{k:'hpp',v:25},seren:{k:'atkp',v:22},kaelen:{k:'cdmg',v:30},ilyas:{k:'spd',v:15},morgane:{k:'crit',v:15},aelis:{k:'res',v:35},garrok:{k:'defp',v:25},ysmira:{k:'atkp',v:20},sylvaris:{k:'spd',v:15},nyxa:{k:'crit',v:15},thorgal:{k:'cdmg',v:30},liora:{k:'hpp',v:18}};
 function leaderOf(h){if(!h)return null;if(h.leg&&LEAD_LEG[h.leg])return LEAD_LEG[h.leg];const s=h.stars||1;return{tank:{k:'defp',v:8+3*s},warrior:{k:'atkp',v:5+3*s},archer:{k:'crit',v:3+2*s},mage:{k:'acc',v:5+5*s},healer:{k:'hpp',v:5+3*s}}[h.cls]||null}
 const leadText=L=>L?`+${L.v} % de ${LEADN[L.k]} pour toute l’équipe`:'';
 const fxChips=x=>(x||'').split(' ').filter(Boolean).map(k=>FX[k]?`<i class="fx ${FX[k].good?'g':'b'}">${FX[k].n}</i>`:'').join('');
@@ -2792,7 +2828,7 @@ async function cloudInit(){
   cloudPush();settingsRefresh();
 }
 function adoptSave(obj,msg){
-  S=obj;migrate();const nd=enforceDead();if(nd)msg=(msg?msg+' ':'')+`${nd} héros déjà tombé${nd>1?'s':''} sur cette partie ${nd>1?'restent':'reste'} au Mémorial.`;CLOUD.status=CLOUD.ref?'on':CLOUD.status;
+  S=obj;migrate();giftCheck();const nd=enforceDead();if(nd)msg=(msg?msg+' ':'')+`${nd} héros déjà tombé${nd>1?'s':''} sur cette partie ${nd>1?'restent':'reste'} au Mémorial.`;CLOUD.status=CLOUD.ref?'on':CLOUD.status;
   tab='home';lastBattle=null;busy=false;sheetId=null;selHero=null;fuseTarget=null;lastPull=null;
   try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}
   closeModal();render();if(msg)toast(msg);cloudPush();
@@ -3022,7 +3058,7 @@ function questAlert(){
 }
 function showIntro(i=0){
   const pages=[
-    ['Bienvenue, Invocateur','La Tour d’Appel s’est réveillée. Ses 250 étages grouillent de monstres, et seuls les héros que vous invoquez peuvent la gravir. Attention : <b>la mort est définitive</b>. Un héros dont les PV tombent à 0 quitte votre équipe et rejoint le Mémorial. Soignez-les à l’Auberge entre deux étages ; une très rare Larme de l’Oracle permet de le ramener au Mémorial, 5 heures après sa chute, mais au niveau 1.'],
+    ['Bienvenue, Invocateur','La Tour d’Appel s’est réveillée. Ses 250 étages grouillent de monstres, et seuls les héros que vous invoquez peuvent la gravir. Attention : <b>la mort est définitive</b> dans la Tour (les donjons, eux, sont sans risque). Un héros dont les PV tombent à 0 quitte votre équipe et rejoint le Mémorial. Soignez-les à l’Auberge entre deux étages ; une très rare Larme de l’Oracle permet de le ramener au Mémorial, 5 heures après sa chute, mais au niveau 1.'],
     ['Votre première équipe','Invoquez des héros au portail, placez-les dans la formation (les Gardiens et Guerriers devant, les Archers, Mages et Soigneurs derrière), puis lancez le combat. Les éléments et les synergies de classe font la différence.'],
     ['Devenir plus fort','Équipez vos héros grâce aux donjons, améliorez leurs pièces, faites-les monter d’étoiles avec les éclats, et suivez le Guide et les Missions du jour : ils vous montrent toujours quoi faire ensuite.']
   ];
@@ -3138,6 +3174,16 @@ function ascend(id){
 }
 
 /* ---------- Registre des morts : la mort reste définitive même en important une ancienne sauvegarde ---------- */
+/* Cadeaux uniques envoyés à tous les joueurs (une seule fois par appareil et par partie) */
+const GIFTK='appel-tour-gifts',GIFTS=[{k:'tears20',tears:20,msg:'Cadeau de l’Oracle : +20 Larmes de l’Oracle pour ramener vos héros tombés !'}];
+function giftCheck(){
+  let loc=[];try{loc=JSON.parse(localStorage.getItem(GIFTK)||'[]')}catch(e){}if(!Array.isArray(loc))loc=[];
+  S.gifts=S.gifts||[];const got=[];
+  for(const g of GIFTS){if(S.gifts.includes(g.k)||loc.includes(g.k)){if(!S.gifts.includes(g.k))S.gifts.push(g.k);continue}
+    S.gifts.push(g.k);loc.push(g.k);if(g.tears)S.tears=(S.tears||0)+g.tears;got.push(g.msg)}
+  try{localStorage.setItem(GIFTK,JSON.stringify(loc))}catch(e){}
+  if(got.length){save();setTimeout(()=>{toast(got.join(' '));try{sfx('ult')}catch(e){}},1500)}
+}
 const DEADK='appel-tour-dead';let deadPushed='';
 function deadLocal(){try{const a=JSON.parse(localStorage.getItem(DEADK)||'[]');return Array.isArray(a)?a:[]}catch(e){return[]}}
 function deadStore(a){try{localStorage.setItem(DEADK,JSON.stringify(a.slice(-1500)))}catch(e){}}
@@ -3317,7 +3363,8 @@ function runDungeon(k){
   seeFoes(dunFoes(k),d.n);const label=`${d.n} niv. ${L}`;
   const sum={label,win:false,fallen:[],levels:[],gems:0,gold:0,loot:[],sold:0};
   startBattle(party,dunFoes(k),S.slots,sum,res=>{sum.win=res.win;
-  casualties(res,sum,label);
+  /* Donjons sans risque : aucun héros ne meurt et les PV ne baissent pas */
+  sum.ko=res.U.filter(u=>u.side==='h'&&!u.alive).length;
   if(res.win){rareDrop(sum);
     const feat=dunFeat()===k?2:1;if(feat>1)sum.feat=true;
     sum.gold=Math.round((d.type==='gold'?goldDunBase(L)*(.9+R()*.2)*feat:dunGold(L))*goldMul());S.gold+=sum.gold;
@@ -3633,7 +3680,7 @@ function heroCard(h,mode,note,delay){
   return`<article class="hero r${h.stars}${fuseTarget===h.id&&mode==='full'?' fuse-on':''}"${style}>
     ${flag}<div class="pic">${portrait(h)}</div>
     <div><div class="hname">${h.name}${awkTag(h)}</div>${L?`<div class="title">${L.title}</div>`:''}${starsHtml(h.stars)}${dupStars(h)}</div>
-    <div class="meta">${elChip(h.el)} ${CLASSES[h.cls].n} · Niv. ${h.lvl}${h.lvl>=cap?' (max)':''}</div>${traitOf(h)?`<div class="trait" style="--tc:${traitOf(h).c}"><b>${traitOf(h).n}</b> · ${traitOf(h).d}</div>`:''}
+    <div class="meta">${elChip(h.el)} ${CLASSES[h.cls].n} · <span class="race">${raceOf(h)}</span> · Niv. ${h.lvl}${h.lvl>=cap?' (max)':''}</div>${traitOf(h)?`<div class="trait" style="--tc:${traitOf(h).c}"><b>${traitOf(h).n}</b> · ${traitOf(h).d}</div>`:''}
     ${L?skillBox(L):''}
     ${mode==='pull'?'':hpBar(h.hp,s.hp)}
     ${mode==='full'?`<dl class="st"><div><dt>ATQ</dt><dd>${s.atk}</dd></div><div><dt>DÉF</dt><dd>${s.def}</dd></div><div><dt>VIT</dt><dd>${s.spd}</dd></div><div><dt>CRIT</dt><dd>${s.crit}%</dd></div><div><dt>D.CRIT</dt><dd>${s.cdmg}%</dd></div><div><dt>PÉN</dt><dd>${s.pen}%</dd></div></dl>
@@ -3942,12 +3989,13 @@ function renderFuse(){
   </section>`;
 }
 
+let HLIM=24;
 function renderHeroes(){
   if(sheetId!=null&&heroById(sheetId))return renderSheet();
   const hs=(S.settings&&S.settings.hsort)||'rar',CO=['tank','warrior','archer','mage','healer'],EO=Object.keys(ELEM);
   const base=(a,b)=>b.stars-a.stars||(b.awk||0)-(a.awk||0)||b.lvl-a.lvl||a.name.localeCompare(b.name);
   const cmp=hs==='cls'?(a,b)=>CO.indexOf(a.cls)-CO.indexOf(b.cls)||base(a,b):hs==='el'?(a,b)=>EO.indexOf(a.el)-EO.indexOf(b.el)||base(a,b):hs==='lvl'?(a,b)=>b.lvl-a.lvl||base(a,b):base;
-  const list=S.heroes.slice().sort(cmp);
+  const all=S.heroes.slice().sort(cmp),list=all.slice(0,HLIM);
   const grpKey=h=>hs==='cls'?h.cls:hs==='el'?h.el:hs==='rar'?h.stars:null,grpName=k=>hs==='cls'?CLASSES[k].n:hs==='el'?`${elChip(k)}`:`<span class="r${k}"><span class="stars">${'★'.repeat(k)}</span></span>`;
   const groups=[];list.forEach(h=>{const k=grpKey(h);const g=groups.at(-1);if(g&&g.k===k)g.l.push(h);else groups.push({k,l:[h]})});
   const sortBar=`<div class="hsort"><span class="meta">Trier :</span>${[['rar','Rareté'],['cls','Classe'],['el','Élément'],['lvl','Niveau']].map(([k,l])=>`<button class="chipbtn" data-act="hsort" data-id="${k}" aria-pressed="${hs===k}">${l}</button>`).join('')}</div>`;
@@ -3955,6 +4003,7 @@ function renderHeroes(){
   return`${fuseTarget?renderFuse():''}<div class="row"><button class="btn prime" data-act="goform">${ui('team')}Composer l’équipe</button><button class="btn" data-act="tab" data-id="train">${ui('train')}Zone d’entraînement · ${S.train.length}/${S.trainSlots}</button></div><section><h2>Guilde · ${S.heroes.length} héros · équipe ${S.party.length}/5${fusable?` · ${fusable} fusion${fusable>1?'s':''} possible${fusable>1?'s':''}`:''}</h2>
   ${sortBar}
   ${list.length?(hs==='lvl'?`<div class="grid">${list.map(h=>heroCard(h,'full')).join('')}</div>`:groups.map(g=>`<h3 class="hgrp">${grpName(g.k)} <span class="meta">${g.l.length}</span></h3><div class="grid">${g.l.map(h=>heroCard(h,'full')).join('')}</div>`).join('')):'<p class="empty">Votre guilde est vide. Invoquez des héros au portail.</p>'}
+  ${all.length>list.length?`<div class="row" style="justify-content:center;margin-top:12px"><button class="btn prime" data-act="hmore">Afficher plus · ${list.length}/${all.length}</button><button class="btn" data-act="hmore" data-id="all">Tout afficher</button></div>`:''}
   <p class="note">Fusion : deux héros de même classe et même rareté donnent un héros d’une étoile de plus, jusqu’à 4★. Les 5★ ne s’obtiennent que par invocation. Renvoyer un héros rapporte de l’or (${[1,2,3,4,5].map(s=>`${s}★ ${15*s*s}`).join(' · ')}).</p></section>`;
 }
 
@@ -3982,7 +4031,7 @@ function renderSheet(){
   return`<section class="panel"><button class="btn sm" data-act="closesheet">‹ Retour à la guilde</button>
     <div class="sheethead" style="margin-top:12px"><div class="pic">${portrait(h)}</div>
       <div style="display:grid;gap:5px;min-width:0"><div class="hname" style="font-size:22px">${h.name}${awkTag(h)}</div>${L?`<div class="title">${L.title}</div>`:''}${starsHtml(h.stars)}${dupStars(h)}
-      <div class="meta">${elChip(h.el)} ${CLASSES[h.cls].n} · Niv. ${h.lvl}</div>${hpBar(h.hp,s.hp)}</div></div>
+      <div class="meta">${elChip(h.el)} ${CLASSES[h.cls].n} · <span class="race">${raceOf(h)}</span> · Niv. ${h.lvl}</div>${hpBar(h.hp,s.hp)}</div></div>
     ${L?`<div style="margin-top:10px">${skillBox(L)}</div>`:''}${traitOf(h)?`<div class="trait" style="margin-top:8px;--tc:${traitOf(h).c}">Trait <b>${traitOf(h).n}</b> · ${traitOf(h).d}</div>`:''}
     <h2 style="margin-top:14px">Compétences</h2><p class="meta" style="margin:0 0 6px">Tomes de maîtrise : <b>${S.tomes||0}</b> · ils s’obtiennent tous les 10 étages de la Tour et des tours élémentaires, au coffre des missions du jour, dans le guide et à la 1ʳᵉ place du Draft.</p><div class="sklist">${skillsOf(h).map((k0,i)=>{const l=skLv(h,i),k=skillAt(k0,l),c=SK_COST[l+1];return`<div class="skill"><div class="skhead"><b>${i+1}. ${k.n} · Niv. ${l}/${SK_MAX}${k.cd?` · recharge ${k.cd} tours`:''}</b>${l<SK_MAX?`<button class="btn sm${(S.tomes||0)>=c?' prime':''}" data-act="skup" data-id="${h.id}:${i}" ${(S.tomes||0)>=c?'':'disabled'}>Améliorer · ${c} tome${c>1?'s':''}</button>`:'<span class="good">Max</span>'}</div>${k0.d}${l<SK_MAX?`<div class="meta">Niveau ${l+1} : ${skStep(k0,l+1)}</div>`:''}</div>`}).join('')}
       <div class="skill lead"><b>♛ Chef · ${leadText(leaderOf(h))}</b>S’applique quand ce héros est nommé chef : touchez la couronne ♛ sur sa case dans la formation.</div></div>
@@ -4066,10 +4115,11 @@ function renderDungeon(){
       <div class="pow">Puissance ennemie <b>${fp.toLocaleString('fr-FR')}</b> · votre équipe <b class="${pw>=fp?'good':'bad'}">${pw.toLocaleString('fr-FR')}</b></div>
       ${d.type==='gear'?`<div class="drops">Chances : ${[6,5,4,3,2,1].filter(r=>w[r-1]>0).map(r=>`<span>${rankTag(r)} ${w[r-1]<10?w[r-1].toFixed(1).replace('.',','):Math.round(w[r-1])} %</span>`).join('')}</div>`:`<div class="drops">Récompense : ${d.type==='gold'?`${COIN} environ ${goldDunBase(L).toLocaleString('fr-FR')} or`:`${STARIC} environ ${shardBase(L)} éclats d’étoile · vous en avez ${S.shards}`}</div>`}
       <div class="row"><button class="btn" data-act="bmode" aria-pressed="${isManual()}">${isManual()?'Combat : manuel':'Combat : auto'}</button><button class="btn" data-act="bstyle">Style : ${arenaOn()?'Arène':'Classique'}</button><button class="btn${dloopOn()?' prime':''}" data-act="dloop" aria-pressed="${dloopOn()}" title="Relance le donjon après chaque victoire">${dloopOn()?'Répétition : oui':'Répétition : non'}</button><button class="btn prime" data-act="drun" data-id="${d.k}" ${busy||S.energy<energyCost()||!party.some(h=>h.hp>0)?'disabled':''}>Entrer · ${energyCost()} énergie</button><span class="meta">${d.type==='gear'?`${d.k===fk?'2 à 6':'1 à 3'} pièces · ${dunGold(L)} or`:d.type==='gold'?'Pas d’équipement, beaucoup d’or':`+ ${dunGold(L)} or`}</span></div>
+      <p class="safe">${ui('memorial')}<span><b>Sans risque</b> : aucun héros ne meurt dans les donjons.</span></p>
     </section>`}).join('');
   const energyHtml=`<section class="panel"><div class="hp"><div class="lab"><span>Énergie</span><span id="energy">${S.energy}/${ENERGY_MAX}</span></div><div class="bar ebar"><i style="width:${Math.min(100,S.energy/ENERGY_MAX*100)}%"></i></div></div>
     <div class="refill" id="refill">${refillCost()==null?`<span class="meta">Recharges épuisées pour aujourd’hui (${REFILL_N}/${REFILL_N}).</span>`:`<button class="btn ${refillAsk?'warn':'prime'}" data-act="refill" ${S.gems<refillCost()||busy?'disabled':''}>${refillAsk?`Confirmer : ${refillCost()} cristaux`:`${ENERGYI} +${REFILL_E} énergie · ${refillCost()} ${GEM}`}</button><span class="meta">${refillUsed()}/${REFILL_N} recharges aujourd’hui · le prix augmente de 25 à chaque recharge</span>`}</div>
-    <p class="note">+3 énergie toutes les 2 minutes (plein en 1 h 20), +50 avec le bonus du jour, +10 par mission du jour et +40 avec leur coffre (l’énergie peut alors dépasser le maximum). Les donjons utilisent la formation de la Tour, et les héros peuvent y mourir aussi. Le rang SS n’apparaît qu’à partir du niveau 7.</p></section>`;
+    <p class="note">+3 énergie toutes les 2 minutes (plein en 1 h 20), +50 avec le bonus du jour, +10 par mission du jour et +40 avec leur coffre (l’énergie peut alors dépasser le maximum). Les donjons utilisent la formation de la Tour. <b>Aucun héros ne meurt dans les donjons</b> et leurs PV ne baissent pas : un héros K.O. se relève après le combat. Le rang SS n’apparaît qu’à partir du niveau 7.</p></section>`;
   const bt=lastBattle&&lastBattle.mode==='dungeon'?renderBattle():'';
   return dsub==='energy'?tabsHtml+energyHtml+bt:tabsHtml+bt+cards;
 }
@@ -4401,7 +4451,8 @@ document.addEventListener('click',e=>{
     case 'bagf':bagFilter=id;render();break;
     case 'bags':bagSet=id;render();break;
     case 'bagc':bagCat=id;render();break;
-    case 'hsort':S.settings=S.settings||{};S.settings.hsort=id;save();render();break;
+    case 'hsort':S.settings=S.settings||{};S.settings.hsort=id;HLIM=24;save();render();break;
+    case 'hmore':{const y=scrollY;HLIM=id==='all'?1e9:HLIM+24;render();scrollTo(0,y);break}
     case 'recr':{recOpen=true;const r=+id;recSel.has(r)?recSel.delete(r):recSel.add(r);recAsk=false;render();break}
     case 'reck':recOpen=true;recKeep=!recKeep;recAsk=false;render();break;
     case 'recgo':recOpen=true;recycle();break;
@@ -4514,6 +4565,7 @@ document.addEventListener('click',e=>{
 
 S=load();
 if(!S||!Array.isArray(S.heroes))newGame();else{migrate();enforceDead();save()}
+giftCheck();
 render();
 if(!S.introSeen)showIntro(0);else if(dailyReady())setTimeout(()=>{if(document.getElementById('modal').hidden)loginModal()},900);
 cloudInit();
