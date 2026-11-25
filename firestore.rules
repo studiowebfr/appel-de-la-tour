@@ -1,17 +1,36 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Compte abandonné : classement inactif depuis 21 jours, ou partie jamais commencée
+    // (étage 0, aucun point RTA) et plus touchée depuis 24 h. N'importe quel joueur connecté
+    // peut alors effacer ses traces publiques (les sauvegardes privées ne sont jamais touchées).
+    function lastSeen(d) {
+      return d.get('lb', {}).get('t', 0) > d.get('rta', {}).get('at', 0)
+        ? d.get('lb', {}).get('t', 0) : d.get('rta', {}).get('at', 0);
+    }
+    function abandonedDoc(d) {
+      return d.get('lb', null) != null && (
+        lastSeen(d) < request.time.toMillis() - 21 * 86400000 ||
+        (d.lb.get('best', 0) == 0 && d.lb.get('et', 0) == 0 && d.get('ra', 0) == 0
+          && lastSeen(d) < request.time.toMillis() - 86400000));
+    }
+    function abandoned(uid) {
+      return request.auth != null && request.auth.uid != uid
+        && exists(/databases/$(database)/documents/drafts/$(uid))
+        && abandonedDoc(get(/databases/$(database)/documents/drafts/$(uid)).data);
+    }
     // Draft de l'Oracle : tout le monde lit, chacun n'écrit que son équipe
     match /drafts/{uid} {
       allow read: if true;
       allow write: if request.auth != null && request.auth.uid == uid;
+      allow delete: if request.auth != null && request.auth.uid != uid && abandonedDoc(resource.data);
     }
     // Chat global : tout le monde lit, chacun n'écrit que ses propres messages
     match /chat/{uid} {
       allow read: if true;
       allow create, update: if request.auth != null && request.auth.uid == uid
                    && request.resource.data.msgs.size() <= 40;
-      allow delete: if request.auth != null && request.auth.uid == uid;
+      allow delete: if (request.auth != null && request.auth.uid == uid) || abandoned(uid);
     }
     // Guildes en ligne : tout le monde lit, chaque chef n'écrit que sa guilde
     match /guilds/{uid} {
@@ -22,6 +41,7 @@ service cloud.firestore {
     match /gmem/{uid} {
       allow read: if true;
       allow write: if request.auth != null && request.auth.uid == uid;
+      allow delete: if abandoned(uid);
     }
     // Sauvegardes : privées, seul le joueur lui-même peut lire et écrire la sienne
     match /data/users/{uid}/{docId} {

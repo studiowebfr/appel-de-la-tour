@@ -532,6 +532,12 @@ button.me{border:0;cursor:pointer}
 .log p.ult{color:#7a2fb0;font-weight:800}
 @media (prefers-reduced-motion:reduce){.fnum,.ult.show,.tok.act .tface,.tok.hit .tface{animation:none}}
 .race{color:#c9b6ff;font-weight:600}
+.troll{display:grid;gap:6px;margin-top:8px}.troll .btn{justify-self:start}
+.tlist{display:flex;flex-wrap:wrap;gap:4px}.tlist i{font-style:normal;font-size:11px;font-weight:700;padding:2px 7px;border-radius:999px;border:1px solid var(--tc);color:var(--tc);opacity:.45}.tlist i.on{opacity:1;background:color-mix(in srgb,var(--tc) 22%,transparent)}
+.patch{border:1px solid rgba(140,180,255,.22);border-radius:12px;padding:10px 12px;margin-top:10px;background:rgba(10,22,48,.55)}
+.patch.new{border-color:#ffd35a;box-shadow:0 0 0 1px rgba(255,211,90,.25)}
+.patch .ph{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.patch .ph b{color:#ffd35a}.patch .ph i{font-style:normal;font-size:11px;font-weight:800;background:#ffd35a;color:#2a1a00;border-radius:999px;padding:1px 8px}
+.patch ul{margin:6px 0 0;padding-left:18px;display:grid;gap:4px}.patch li{line-height:1.4}
 .trait{--tc:#9fd8ff;font-size:12px;font-weight:700;color:#eaf4ff;background:color-mix(in srgb,var(--tc) 22%,rgba(6,14,32,.85));border:1.5px solid var(--tc);border-left-width:5px;border-radius:8px;padding:4px 8px;line-height:1.3;box-shadow:0 0 10px color-mix(in srgb,var(--tc) 40%,transparent)}.trait b{color:var(--tc);font-weight:900;text-transform:uppercase;letter-spacing:.04em}
 .setn{color:#9fd8ff;font-weight:800}
 @media (max-width:420px){
@@ -1270,6 +1276,22 @@ const setLine=(k,n)=>{const st=SETS[k],t=setTimes(k,n);return`${setIc(k)}Set ${s
 function setEffOf(h){const e={};if(h&&h.leg&&LEGEFF[h.leg])Object.assign(e,LEGEFF[h.leg]);if(!h||h.id==null||h.pvpMerc)return e;const sc=setCounts(h);for(const k in sc){const st=SETS[k];if(st&&st.fx&&sc[k]>=st.p)e[st.fx]=1}return e}
 const setDesc=k=>`${setIc(k)}<b style="color:${SETI[k]?SETI[k][0]:'inherit'}">${SETS[k].n}</b> · ${SETS[k].p} pièces : ${SETS[k].d}${SETS[k].p===2&&!SETS[k].fx?' (cumulable)':''}`;
 const traitOf=h=>TRAITS.find(t=>t.k===h.trait);
+/* Changer le trait de caractère contre des cristaux (tirage au hasard, jamais le même) */
+const TRAIT_COST=150;let traitAsk=null;
+function traitRollBox(h){
+  const ask=traitAsk===h.id,can=(S.gems||0)>=TRAIT_COST;
+  return`<div class="troll"><button class="btn sm${ask?' warn':' prime'}" data-act="traitroll" data-id="${h.id}" ${busy||!can?'disabled':''}>${ask?`Confirmer · ${TRAIT_COST} ◆`:`🎲 Changer de trait · ${TRAIT_COST} ◆`}</button>
+    <span class="meta">${can?'Nouveau trait au hasard parmi les '+(TRAITS.length-1)+' autres.':`Il faut ${TRAIT_COST} cristaux.`}</span>
+    <div class="tlist">${TRAITS.map(t=>`<i style="--tc:${t.c}"${t.k===h.trait?' class="on"':''} title="${t.d}">${t.n}</i>`).join('')}</div></div>`;
+}
+function traitRoll(id){
+  const h=heroById(id);if(!h||busy||!traitOf(h))return;
+  if((S.gems||0)<TRAIT_COST)return toast(`Il faut ${TRAIT_COST} cristaux pour changer de trait.`);
+  if(traitAsk!==id){traitAsk=id;render();setTimeout(()=>{if(traitAsk===id){traitAsk=null;render()}},4000);return}
+  traitAsk=null;S.gems-=TRAIT_COST;const old=traitOf(h),opts=TRAITS.filter(t=>t.k!==h.trait),nt=pick(opts);
+  withRatio(h,()=>{h.trait=nt.k});try{sfx('ult');vib([30,30,60])}catch(e){}save();render();
+  toast(`${h.name} : ${old.n} → ${nt.n} (${nt.d}).`);
+}
 function setCounts(h){const c={};if(!S||!S.inv||h.id==null)return c;for(const it of S.inv)if(it.by===h.id&&it.set)c[it.set]=(c[it.set]||0)+1;return c}
 function gearSum(h,none){
   const g={hp:0,def:0,atk:0,hpp:0,defp:0,atkp:0,spd:0,spdp:0,crit:0,cdmg:0,pen:0,acc:0,res:0};
@@ -2295,7 +2317,7 @@ async function initPvp(){
   PV.unsub=PV.db.collection('drafts').onSnapshot(snap=>{
     if(!snap.metadata.fromCache)clearTimeout(timer);
     PV.status='online';PV.docs=snap.docs.map(x=>({id:x.id,...x.data()}));
-    pvpNames();lbSync();rtaSnap();deadCheck();if((tab==='pvp'||tab==='rank')&&!busy)render();
+    pvpNames();lbSync();rtaSnap();deadCheck();cleanAbandoned();if((tab==='pvp'||tab==='rank')&&!busy)render();
   },()=>{clearTimeout(timer);PV.status='offline';if(tab==='pvp'&&!busy)render()});
 }
 async function pvpNames(){
@@ -2374,7 +2396,20 @@ const TITLES=[
   {k:'fidele',n:'Fidèle',chk:()=>(S.login&&S.login.n||0)>=7},{k:'saison',n:'Champion de saison',chk:()=>passLvl()>=PASS_TIERS}
 ];
 const myTitle=()=>{const k=S.settings&&S.settings.title,t=TITLES.find(x=>x.k===k);return t&&t.chk()?t.n:''};
-const ACTIVE_DAYS=21,docActive=x=>x.id===PV.uid||Math.max((x.lb&&x.lb.t)||0,(x.rta&&x.rta.at)||0)>Date.now()-ACTIVE_DAYS*864e5;
+const ACTIVE_DAYS=21,lastSeen=x=>Math.max((x.lb&&x.lb.t)||0,(x.rta&&x.rta.at)||0);
+/* Compte abandonné : inactif depuis 21 jours, ou partie jamais commencée (étage 0) et plus touchée depuis 24 h
+   (c'est ce qui reste quand un joueur recommence une partie sur un autre compte) */
+const docAbandoned=x=>!!x&&x.id!==PV.uid&&!!x.lb&&(lastSeen(x)<Date.now()-ACTIVE_DAYS*864e5||(!(x.lb.best>0)&&!(x.lb.et>0)&&!(x.ra>0)&&lastSeen(x)<Date.now()-864e5));
+const docActive=x=>x.id===PV.uid||(lastSeen(x)>Date.now()-ACTIVE_DAYS*864e5&&!docAbandoned(x));
+const CLEANK='appel-tour-clean';
+async function cleanAbandoned(){
+  try{const last=+(localStorage.getItem(CLEANK)||0);if(Date.now()-last<6*36e5)return;localStorage.setItem(CLEANK,String(Date.now()))}catch(e){return}
+  const dead=(PV.docs||[]).filter(docAbandoned).slice(0,40);
+  for(const x of dead){
+    for(const c of['chat','gmem'])try{await PV.db.collection(c).doc(x.id).delete()}catch(e){}
+    try{await PV.db.collection('drafts').doc(x.id).delete()}catch(e){}
+  }
+}
 const lbName=x=>(x.me?'Vous':(x.p||PV.names[x.id]||'Joueur'))+((x.me?myTitle():x.lb&&typeof x.lb.ti==='string'?x.lb.ti.slice(0,30):'')?` « ${x.me?myTitle():x.lb.ti.slice(0,30)} »`:'');
 function rankRows(list,fmt){
   if(!list.length)return'<p class="empty">Personne n’est encore classé ici.</p>';
@@ -3774,6 +3809,7 @@ function renderHome(){
       <button class="rb" data-act="tab" data-id="guild"><span class="o">${S.guild?emblem(S.guild,26):ui('team')}</span>${gAlert()?'<span class="badge">!</span>':''}<span>Guilde</span></button>
       <button class="rb" data-act="tab" data-id="rank"><span class="o">${ui('rank')}</span><span>Classement</span></button>
       <button class="rb" data-act="tab" data-id="memorial"><span class="o">${ui('memorial')}</span>${canRevive()?'<span class="badge">!</span>':''}<span>Mémorial</span></button>
+      <button class="rb" data-act="tab" data-id="patch"><span class="o">${ui('scroll')}</span>${patchNew()?'<span class="badge">!</span>':''}<span>Patch</span></button>
 
     </div>
     <div class="homefoot">
@@ -4032,7 +4068,7 @@ function renderSheet(){
     <div class="sheethead" style="margin-top:12px"><div class="pic">${portrait(h)}</div>
       <div style="display:grid;gap:5px;min-width:0"><div class="hname" style="font-size:22px">${h.name}${awkTag(h)}</div>${L?`<div class="title">${L.title}</div>`:''}${starsHtml(h.stars)}${dupStars(h)}
       <div class="meta">${elChip(h.el)} ${CLASSES[h.cls].n} · <span class="race">${raceOf(h)}</span> · Niv. ${h.lvl}</div>${hpBar(h.hp,s.hp)}</div></div>
-    ${L?`<div style="margin-top:10px">${skillBox(L)}</div>`:''}${traitOf(h)?`<div class="trait" style="margin-top:8px;--tc:${traitOf(h).c}">Trait <b>${traitOf(h).n}</b> · ${traitOf(h).d}</div>`:''}
+    ${L?`<div style="margin-top:10px">${skillBox(L)}</div>`:''}${traitOf(h)?`<div class="trait" style="margin-top:8px;--tc:${traitOf(h).c}">Trait <b>${traitOf(h).n}</b> · ${traitOf(h).d}</div>`:''}${traitOf(h)?traitRollBox(h):''}
     <h2 style="margin-top:14px">Compétences</h2><p class="meta" style="margin:0 0 6px">Tomes de maîtrise : <b>${S.tomes||0}</b> · ils s’obtiennent tous les 10 étages de la Tour et des tours élémentaires, au coffre des missions du jour, dans le guide et à la 1ʳᵉ place du Draft.</p><div class="sklist">${skillsOf(h).map((k0,i)=>{const l=skLv(h,i),k=skillAt(k0,l),c=SK_COST[l+1];return`<div class="skill"><div class="skhead"><b>${i+1}. ${k.n} · Niv. ${l}/${SK_MAX}${k.cd?` · recharge ${k.cd} tours`:''}</b>${l<SK_MAX?`<button class="btn sm${(S.tomes||0)>=c?' prime':''}" data-act="skup" data-id="${h.id}:${i}" ${(S.tomes||0)>=c?'':'disabled'}>Améliorer · ${c} tome${c>1?'s':''}</button>`:'<span class="good">Max</span>'}</div>${k0.d}${l<SK_MAX?`<div class="meta">Niveau ${l+1} : ${skStep(k0,l+1)}</div>`:''}</div>`}).join('')}
       <div class="skill lead"><b>♛ Chef · ${leadText(leaderOf(h))}</b>S’applique quand ce héros est nommé chef : touchez la couronne ♛ sur sa case dans la formation.</div></div>
     <h2 style="margin-top:14px">Statistiques</h2>
@@ -4407,6 +4443,59 @@ function revive(i){
   const h={...base,id:S.next++,lvl:1,xp:0,skl:[1,1,1],awk:x.awk||base.awk||0};delete h.hpMul;if(!h.leg)delete h.leg;h.hp=stats(h).hp;
   S.heroes.push(h);sfx('heal');save();render();toast(`${h.name} revient à la vie au niveau 1, avec ses ${h.awk} doublon${h.awk>1?'s':''}. Son équipement est dans le sac.`);
 }
+/* ---------- Notes de patch ---------- */
+const PATCH=[
+ {v:'1.9',d:'25 novembre',l:[
+  '24 nouveaux héros : orques, nains, draconides, elfes, elfe noire, dryade, faune, gnome, néréide, demi-démon et hommes-bêtes (tigre, loup, lapin, faucon, chat).',
+  '6 nouvelles légendes 5★ : Garrok l’ours, Ysmira la draconide, Sylvaris l’elfe, Nyxa la kitsune, Thorgal le nain et Liora l’ange.',
+  '3 nouveaux liens de légendes : Crocs et griffes, Forge des anciens, Ciel embrasé.',
+  'La race de chaque héros s’affiche sur sa fiche.',
+  'Changer le trait d’un héros : 150 cristaux, depuis sa fiche.',
+  'Un héros déjà au maximum de doublons donne des cristaux à la place.',
+  'Onglet Héros beaucoup plus rapide : 24 héros affichés, puis « Afficher plus ».',
+  'Cadeau : 20 Larmes de l’Oracle pour tout le monde.',
+  'Plus aucun héros ne meurt dans les donjons.',
+  'Les comptes abandonnés disparaissent du classement.',
+  'Nouvel onglet Patch (celui-ci !).']},
+ {v:'1.8',d:'24 novembre',l:[
+  'Recommencer une partie efface l’ancien compte en ligne.',
+  'Les joueurs inactifs depuis 21 jours sont retirés du classement.',
+  'Correction : la loupe iPhone qui apparaissait pendant l’invocation.',
+  'Correction : les récompenses s’affichaient avant la fin du combat.']},
+ {v:'1.7',d:'23 novembre',l:[
+  'Nouvel écran de victoire avec 1 à 3 étoiles, coffres animés et récompenses qui volent jusqu’en haut.',
+  'Invocation en maintenant le doigt, avec une couleur qui annonce la rareté.',
+  'Musiques et sons selon l’endroit, vibrations, transitions entre les écrans.',
+  'Combats : coups critiques et combos affichés, ralenti sur le boss, présentation des boss.',
+  'Vitesse ×1, ×2, ×4 et répétition automatique des donjons.',
+  'Calendrier de connexion sur 7 jours, passe de saison gratuit et titres.',
+  'Aura sur les héros 5★ et 6★.',
+  'Tri des héros par rareté, classe, élément ou niveau.',
+  'Catégories dans la Tour et dans les donjons.']},
+ {v:'1.6',d:'22 novembre',l:[
+  'Nouveaux combats en arène façon Summoners War, avec des personnages en entier et des attaques animées.',
+  'Choix du style de combat : Arène ou Classique (dans les Réglages).',
+  'Nouvel accueil : tour animée, bulles, ressources sur une ligne.',
+  'Invocation animée en très haute qualité.']},
+ {v:'1.5',d:'21 novembre',l:[
+  'Mode Difficile de la Tour après l’étage 250, avec de bien meilleures récompenses.',
+  'Recharger l’énergie avec des cristaux : +60, 5 fois par jour.',
+  'Larme de l’Oracle : ressource très rare pour ramener un héros du Mémorial, 5 h après sa chute.',
+  'PvP en temps réel (RTA) : choix des héros, bannissement, combat manuel.',
+  'Donjons avec des sets d’équipement différents, chaque set a son logo.',
+  'Sac plus grand (200 places) avec Équipements et Ressources séparés.',
+  'Recyclage rapide de l’équipement par rareté.',
+  'Traits de caractère plus visibles, en couleur.',
+  'Correction : un import de sauvegarde ne peut plus ressusciter les héros morts.']}
+];
+const PATCHK='appel-tour-patch';
+const patchNew=()=>{try{return localStorage.getItem(PATCHK)!==PATCH[0].v}catch(e){return false}};
+function renderPatch(){
+  try{localStorage.setItem(PATCHK,PATCH[0].v)}catch(e){}
+  return`<section class="panel"><h2>Notes de patch</h2><p class="meta" style="margin-top:-4px">Les nouveautés du jeu, des plus récentes aux plus anciennes.</p>
+  ${PATCH.map((p,i)=>`<div class="patch${i?'':' new'}"><div class="ph"><b>Version ${p.v}</b><span class="meta">${p.d}</span>${i?'':'<i>Nouveau</i>'}</div><ul>${p.l.map(x=>`<li>${x}</li>`).join('')}</ul></div>`).join('')}
+  </section>`;
+}
 function renderMemorial(){
   return`<section class="panel"><h2>Mémorial des tombés</h2><div class="tearbox"><span class="resic">${TEARI}</span><div><b>${S.tears||0} Larme${(S.tears||0)>1?'s':''} de l’Oracle</b><div class="meta">Ressource très rare : 0,1 % de chance à chaque victoire (Tour, donjons, tours élémentaires, événements, boss de guilde, farm automatique). Pas dans les missions ni en PvP.</div></div></div>
   <p class="note">Une Larme ramène un héros tombé, au plus tôt 5 heures après sa chute. Il revient au <b>niveau 1</b>, compétences au niveau 1, et ne garde que ses étoiles et ses doublons. Son équipement est resté dans le sac.</p>
@@ -4426,7 +4515,7 @@ function render(){
   if(RTAB!==tab){RTAB=tab;m.classList.remove('tenter');void m.offsetWidth;requestAnimationFrame(()=>{m.classList.add('tenter')})}
   m.className=tab==='home'?'home':'pad gut';
   if(tab==='home'&&!HM.raf&&!matchMedia('(prefers-reduced-motion: reduce)').matches)requestAnimationFrame(()=>{if(!HM.raf)HM.raf=requestAnimationFrame(homeMotes)});
-  m.innerHTML=tab==='home'?renderHome():tab==='tower'?renderTower():tab==='dungeon'?renderDungeon():tab==='bag'?renderBag():tab==='quests'?renderQuests():tab==='pvp'?renderPvp():tab==='guild'?renderGuild():tab==='events'?renderEvents():tab==='etower'?renderETower():tab==='train'?renderTrain():tab==='summon'?renderSummon():tab==='heroes'?renderHeroes():tab==='rank'?renderRank():renderMemorial();
+  m.innerHTML=tab==='home'?renderHome():tab==='tower'?renderTower():tab==='dungeon'?renderDungeon():tab==='bag'?renderBag():tab==='quests'?renderQuests():tab==='pvp'?renderPvp():tab==='guild'?renderGuild():tab==='events'?renderEvents():tab==='etower'?renderETower():tab==='train'?renderTrain():tab==='summon'?renderSummon():tab==='heroes'?renderHeroes():tab==='rank'?renderRank():tab==='patch'?renderPatch():renderMemorial();
   const l=document.getElementById('blog');if(l)l.scrollTop=l.scrollHeight;
 }
 
@@ -4549,6 +4638,7 @@ document.addEventListener('click',e=>{
     case 'rsub':rsub=id;render();break;
     case 'revive':revive(+id);break;
     case 'dupfuse':dupFuse(+id);break;
+    case 'traitroll':traitRoll(+id);break;
     case 'skup':{const [a,b]=String(id).split(':');skillUp(+a,+b);break}
     case 'bstyle':{S.settings=S.settings||{};S.settings.bstyle=arenaOn()?'classic':'arena';save();const mo=document.getElementById('modal');if(mo&&!mo.hidden&&typeof settingsRefresh==='function'){openSettings()}render();if(lastBattle&&!lastBattle.done)bctlRefresh();toast(arenaOn()?'Combats en style Arène : personnages en pied, attaques animées et effets.':'Combats en style Classique : portraits et affichage sobre.');break}
     case 'bmode':S.settings=S.settings||{};S.settings.manual=!S.settings.manual;save();render();toast(S.settings.manual?'Mode manuel : vous choisissez les compétences et les cibles.':'Mode auto : vos héros combattent seuls.');break;
