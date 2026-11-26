@@ -844,9 +844,12 @@ button.starplate{background:none;border:0;color:inherit;font:inherit;cursor:poin
 .hud .wallet .pill span{min-width:0;white-space:nowrap;padding:0 1px}
 .hud .wallet .pill .plus{width:16px;height:16px;line-height:16px;font-size:12px;flex:none}
 @media (min-width:520px){.hud .wallet .pill{font-size:13px;padding:3px 5px 3px 3px;gap:5px}.hud .wallet .pill svg{width:20px;height:20px}.hud .wallet .pill .plus{width:20px;height:20px;line-height:20px}}
-.scene .side{gap:4px}
-.scene .rb .o{width:50px;height:50px}
-.scene .rb .o svg,.scene .rb .o img.art{width:24px;height:24px}
+.scene .side{gap:0;top:10px;display:flex;flex-direction:column;justify-content:space-between;align-items:center}
+.scene .rb .o{width:var(--bs,50px);height:var(--bs,50px)}
+.scene .rb .o svg,.scene .rb .o img.art{width:calc(var(--bs,50px)*.48);height:calc(var(--bs,50px)*.48)}
+.scene .side.tight .rb>span:last-child{font-size:9.5px;padding:1px 6px;margin-top:2px}
+.scene .side.tight .rb{animation-name:hbob2}
+@keyframes hbob2{0%,100%{transform:translateY(0)}50%{transform:translateY(-2px)}}
 .scene .rb>span:last-child{font-size:10.5px;white-space:nowrap}
 .tcats{display:flex;gap:6px;overflow-x:auto;margin:0 0 12px;padding-bottom:2px;scrollbar-width:none}
 .tcats::-webkit-scrollbar{display:none}
@@ -3799,6 +3802,16 @@ function homeMenu(){
     ${it('menuset','',ui('swap'),'Réglages','Son, style des combats, sauvegarde')}
   </div>`);
 }
+/* Bulles de l'accueil : elles se partagent la hauteur libre au-dessus du bas de l'écran,
+   et rétrécissent si elles sont nombreuses, pour qu'aucune ne passe derrière le guide */
+function fitBubbles(){
+  const sc=document.querySelector('.scene'),foot=sc&&sc.querySelector('.homefoot');if(!foot)return;
+  const avail=Math.max(160,foot.offsetTop-14);
+  const sides=[...sc.querySelectorAll('.side')],n=Math.max(1,...sides.map(x=>x.children.length));
+  sides.forEach(sd=>{if(!sd.children.length)return;const per=avail/n;
+    const bs=Math.max(32,Math.min(56,Math.floor(per-24)));sd.style.setProperty('--bs',bs+'px');sd.style.height=avail+'px';sd.classList.toggle('tight',bs<46)});
+}
+addEventListener('resize',()=>requestAnimationFrame(fitBubbles));
 /* Particules lumineuses de l'accueil */
 let HM={raf:0,P:[]};
 function homeMotes(){
@@ -4586,6 +4599,7 @@ function render(){
   try{const bossOn=busy&&lastBattle&&lastBattle.res&&lastBattle.res.U&&lastBattle.res.U.some(u=>u.boss&&u.alive);setMusic(bossOn?'boss':busy&&lastBattle?'battle':tab==='summon'?'summon':['tower','dungeon','etower','pvp','events'].includes(tab)?'battle':'home')}catch(e){}
   if(RTAB!==tab){RTAB=tab;m.classList.remove('tenter');void m.offsetWidth;requestAnimationFrame(()=>{m.classList.add('tenter')})}
   m.className=tab==='home'?'home':'pad gut';
+  if(tab==='home'){fitBubbles();requestAnimationFrame(fitBubbles);setTimeout(fitBubbles,400)}
   if(tab==='home'&&!HM.raf&&!matchMedia('(prefers-reduced-motion: reduce)').matches)requestAnimationFrame(()=>{if(!HM.raf)HM.raf=requestAnimationFrame(homeMotes)});
   m.innerHTML=tab==='home'?renderHome():tab==='tower'?renderTower():tab==='dungeon'?renderDungeon():tab==='bag'?renderBag():tab==='quests'?renderQuests():tab==='pvp'?renderPvp():tab==='guild'?renderGuild():tab==='events'?renderEvents():tab==='etower'?renderETower():tab==='train'?renderTrain():tab==='summon'?renderSummon():tab==='heroes'?renderHeroes():tab==='rank'?renderRank():tab==='patch'?renderPatch():tab==='shop'?renderShop():renderMemorial();
   const l=document.getElementById('blog');if(l)l.scrollTop=l.scrollHeight;
