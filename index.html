@@ -542,6 +542,8 @@ button.me{border:0;cursor:pointer}
 .skroad{list-style:none;margin:6px 0 0;padding:0;display:grid;gap:3px;font-size:12px}.skroad li{opacity:.55;padding-left:18px;position:relative}.skroad li::before{content:'○';position:absolute;left:2px}
 .skroad li.done{opacity:1;color:#8fe6a8}.skroad li.done::before{content:'✓'}.skroad li.next{opacity:1;color:#ffd35a}.skroad li.next::before{content:'➜'}
 .shopgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}.shopitem{display:grid;gap:6px}.shopitem.sold{opacity:.45}.shopitem>.btn{justify-self:stretch}
+.massf{margin-bottom:12px}.massf h3{margin:0 0 8px}.massf .mrow{display:flex;gap:10px;align-items:center;justify-content:space-between;padding:8px 0;border-top:1px solid rgba(140,180,255,.15)}
+.massf .mrow>div{display:grid;gap:3px;min-width:0}.massf .mrow .btn{flex:none}.massf .chipbtn{padding:1px 7px;margin-left:4px;font-size:11px}
 .trait{--tc:#9fd8ff;font-size:12px;font-weight:700;color:#eaf4ff;background:color-mix(in srgb,var(--tc) 22%,rgba(6,14,32,.85));border:1.5px solid var(--tc);border-left-width:5px;border-radius:8px;padding:4px 8px;line-height:1.3;box-shadow:0 0 10px color-mix(in srgb,var(--tc) 40%,transparent)}.trait b{color:var(--tc);font-weight:900;text-transform:uppercase;letter-spacing:.04em}
 .setn{color:#9fd8ff;font-weight:800}
 @media (max-width:420px){
@@ -3708,6 +3710,48 @@ const dupStars=h=>{const n=h.awk||0;return`<div class="dups" role="img" aria-lab
 /* Fusion de doublons : un autre exemplaire du même personnage, hors équipe et entraînement */
 const inAnyTeam=id=>S.slots.includes(id)||Object.values(S.eslots||{}).some(a=>a&&a.includes(id));
 const dupsOf=h=>h.leg?[]:S.heroes.filter(x=>x.id!==h.id&&!x.leg&&x.name===h.name&&x.cls===h.cls&&!inAnyTeam(x.id)&&!inTrain(x.id)).sort((a,b)=>a.stars-b.stars||a.lvl-b.lvl||(a.awk||0)-(b.awk||0));
+/* ---------- Fusion rapide : toutes les fusions en un seul appui ----------
+   Ne sert jamais de matériau : légende, héros d'une équipe, à l'entraînement, ou qui a déjà des doublons. */
+let massMax=4,massAsk=null;
+const massKeep=h=>h.leg||inAnyTeam(h.id)||inTrain(h.id)||(h.awk||0)>0;
+const massVal=h=>(inAnyTeam(h.id)?1e7:0)+(inTrain(h.id)?1e6:0)+(h.awk||0)*1e4+h.lvl*10;
+function massPlan(kind,apply){
+  const H=apply?S.heroes:S.heroes.map(h=>({...h})),gone=new Set(),R0={n:0,cost:0,up:{2:0,3:0,4:0},nogold:false};let gold=S.gold;
+  const alive=()=>H.filter(h=>!gone.has(h.id));
+  const drop=m=>{gone.add(m.id);if(apply){unequipAll(m.id);removeTrain(m.id);removeFromTeam(m.id)}};
+  if(kind==='dup'){
+    for(const h of alive().filter(h=>!h.leg).sort((a,b)=>massVal(b)-massVal(a)||b.stars-a.stars)){
+      if(gone.has(h.id))continue;
+      while((h.awk||0)<AWK_MAX){const m=alive().filter(x=>x.id!==h.id&&!x.leg&&x.name===h.name&&x.cls===h.cls&&!inAnyTeam(x.id)&&!inTrain(x.id)&&!((x.awk||0)>0)).sort((a,b)=>a.stars-b.stars||a.lvl-b.lvl)[0];if(!m)break;
+        drop(m);R0.n++;if(apply)withRatio(h,()=>{h.awk=(h.awk||0)+1});else h.awk=(h.awk||0)+1;h.lvl=Math.max(h.lvl,m.lvl)}}
+  }else{
+    for(let st=1;st<Math.min(4,massMax);st++)for(const c of Object.keys(CLASSES)){
+      let g=alive().filter(h=>!h.leg&&h.cls===c&&h.stars===st).sort((a,b)=>massVal(b)-massVal(a));
+      while(g.length>=2){const t=g[0],mats=g.slice(1).filter(x=>!massKeep(x));if(!mats.length)break;const m=mats[mats.length-1],cost=fuseCost(t);
+        if(gold<cost){R0.nogold=true;break}
+        gold-=cost;R0.cost+=cost;R0.n++;drop(m);t.stars++;t.lvl=Math.max(t.lvl,m.lvl);t.xp=0;if(apply)t.hp=stats(t).hp;R0.up[t.stars]++;
+        g=g.filter(x=>x.id!==t.id&&x.id!==m.id)}}
+  }
+  if(apply){S.gold-=R0.cost;S.heroes=S.heroes.filter(h=>!gone.has(h.id))}
+  return R0;
+}
+function massFuse(kind){
+  if(busy)return;const P=massPlan(kind,false);if(!P.n)return toast('Aucune fusion possible.');
+  if(massAsk!==kind){massAsk=kind;render();setTimeout(()=>{if(massAsk===kind){massAsk=null;render()}},5000);return}
+  massAsk=null;const R0=massPlan(kind,true);fuseTarget=null;HLIM=24;try{sfx('ult');vib([20,40,20,40,80])}catch(e){}save();render();
+  toast(kind==='dup'?`${R0.n} doublon${R0.n>1?'s':''} absorbé${R0.n>1?'s':''} !`:`${R0.n} fusion${R0.n>1?'s':''} réussie${R0.n>1?'s':''} : ${[2,3,4].filter(k=>R0.up[k]).map(k=>`+${R0.up[k]} héros ${k}★`).join(', ')} (${fmtN(R0.cost)} or).`);
+}
+function massPanel(){
+  const F=massPlan('fuse',false),D=massPlan('dup',false);if(!F.n&&!D.n&&!F.nogold)return'';
+  const chips=[2,3,4].map(k=>`<button class="chipbtn" data-act="massmax" data-id="${k}" aria-pressed="${massMax===k}">${'★'.repeat(k)}</button>`).join('');
+  return`<section class="panel massf"><h3>Fusion rapide</h3>
+   <div class="mrow"><div><b>Fusions d’étoiles</b><span class="meta">Monter jusqu’à ${chips}</span>
+     <span class="meta">${F.n?`${F.n} fusion${F.n>1?'s':''} : ${[2,3,4].filter(k=>F.up[k]).map(k=>`+${F.up[k]} ${k}★`).join(' · ')} · ${fmtN(F.cost)} or`:'Rien à fusionner'}${F.nogold?' · pas assez d’or pour tout faire':''}</span></div>
+     <button class="btn${massAsk==='fuse'?' warn':' prime'}" data-act="massfuse" data-id="fuse" ${F.n?'':'disabled'}>${massAsk==='fuse'?`Confirmer ${F.n} fusions`:'Tout fusionner'}</button></div>
+   <div class="mrow"><div><b>Doublons</b><span class="meta">${D.n?`${D.n} doublon${D.n>1?'s':''} à absorber (le meilleur exemplaire de chaque héros les garde)`:'Aucun doublon à absorber'}</span></div>
+     <button class="btn${massAsk==='dup'?' warn':' prime'}" data-act="massfuse" data-id="dup" ${D.n?'':'disabled'}>${massAsk==='dup'?`Confirmer ${D.n} doublons`:'Tout absorber'}</button></div>
+   <p class="meta" style="margin:6px 0 0">Jamais utilisés comme matériau : les légendes, les héros d’une équipe, à l’entraînement ou qui ont déjà des doublons. Le héros gardé est toujours le meilleur (équipe, doublons, niveau).</p></section>`;
+}
 let dupAsk=null;
 function dupFuse(id){
   const h=heroById(id);if(!h||busy||h.leg||(h.awk||0)>=AWK_MAX)return;
@@ -4075,7 +4119,7 @@ function renderHeroes(){
   const groups=[];list.forEach(h=>{const k=grpKey(h);const g=groups.at(-1);if(g&&g.k===k)g.l.push(h);else groups.push({k,l:[h]})});
   const sortBar=`<div class="hsort"><span class="meta">Trier :</span>${[['rar','Rareté'],['cls','Classe'],['el','Élément'],['lvl','Niveau']].map(([k,l])=>`<button class="chipbtn" data-act="hsort" data-id="${k}" aria-pressed="${hs===k}">${l}</button>`).join('')}</div>`;
   const fusable=S.heroes.filter(canFuse).length;
-  return`${fuseTarget?renderFuse():''}<div class="row"><button class="btn prime" data-act="goform">${ui('team')}Composer l’équipe</button><button class="btn" data-act="tab" data-id="train">${ui('train')}Zone d’entraînement · ${S.train.length}/${S.trainSlots}</button></div><section><h2>Guilde · ${S.heroes.length} héros · équipe ${S.party.length}/5${fusable?` · ${fusable} fusion${fusable>1?'s':''} possible${fusable>1?'s':''}`:''}</h2>
+  return`${fuseTarget?renderFuse():''}${massPanel()}<div class="row"><button class="btn prime" data-act="goform">${ui('team')}Composer l’équipe</button><button class="btn" data-act="tab" data-id="train">${ui('train')}Zone d’entraînement · ${S.train.length}/${S.trainSlots}</button></div><section><h2>Guilde · ${S.heroes.length} héros · équipe ${S.party.length}/5${fusable?` · ${fusable} fusion${fusable>1?'s':''} possible${fusable>1?'s':''}`:''}</h2>
   ${sortBar}
   ${list.length?(hs==='lvl'?`<div class="grid">${list.map(h=>heroCard(h,'full')).join('')}</div>`:groups.map(g=>`<h3 class="hgrp">${grpName(g.k)} <span class="meta">${g.l.length}</span></h3><div class="grid">${g.l.map(h=>heroCard(h,'full')).join('')}</div>`).join('')):'<p class="empty">Votre guilde est vide. Invoquez des héros au portail.</p>'}
   ${all.length>list.length?`<div class="row" style="justify-content:center;margin-top:12px"><button class="btn prime" data-act="hmore">Afficher plus · ${list.length}/${all.length}</button><button class="btn" data-act="hmore" data-id="all">Tout afficher</button></div>`:''}
@@ -4525,6 +4569,11 @@ function renderShop(){const sh=shopCheck();sh.seen=true;
 }
 /* ---------- Notes de patch ---------- */
 const PATCH=[
+ {v:'2.1',d:'27 novembre',l:[
+  'Fusion rapide (onglet Héros) : toutes les fusions d’étoiles en un seul appui, jusqu’à 2★, 3★ ou 4★.',
+  'Tous les doublons absorbés en un seul appui.',
+  'Les héros d’équipe, à l’entraînement, avec doublons et les légendes ne sont jamais sacrifiés.',
+  'Accueil : toutes les bulles restent visibles, même sur petit écran.']},
  {v:'2.0',d:'26 novembre',l:[
   'Nouveau Marchand (sur l’accueil) : de l’équipement à acheter avec votre or, nouveau stock chaque jour.',
   'Comptoir aux cristaux : Tomes de maîtrise, éclats d’étoile, équipement S et SS, places de sac en plus.',
@@ -4725,6 +4774,8 @@ document.addEventListener('click',e=>{
     case 'revive':revive(+id);break;
     case 'dupfuse':dupFuse(+id);break;
     case 'traitroll':traitRoll(+id);break;
+    case 'massfuse':massFuse(id);break;
+    case 'massmax':massMax=+id;massAsk=null;render();break;
     case 'shopbuy':shopBuy(+id);break;
     case 'shopref':shopRefresh();break;
     case 'shopgem':shopGem(id);break;
